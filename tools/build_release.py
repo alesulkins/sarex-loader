@@ -23,15 +23,21 @@ ROOT_FILES = (
     "MANIFEST.in",
     "customer.routes.toml",
     "README.md",
-    "ACCEPTANCE.md",
     "start.py",
     "start.bat",
     "start.command",
-    "setup.bat",
-    "start-upload.bat",
-    "start-fill-urls.bat",
     "tools/mock_demo.py",
 )
+
+# Standalone developer diagnostics, not imported by the customer entry points.
+# Keep these in the repository; test_delivery_manifest checks the shipped import closure.
+DEVELOPER_MODULES = frozenset({
+    'api_workflow', 'children', 'gateway_check', 'gateway_client', 'gateway_compare',
+    'gateway_diagnostic', 'gateway_read_only', 'gateway_summary', 'live_upload',
+    'read_only_api', 'target_diagnostics', 'target_response_trace', 'test_disk_config',
+    'test_target_check', 'token_response_diagnostic',
+})
+RELEASE_VERSION = 'v0.1.0-rc.7'
 
 
 def build(root, output, version, *, include_account=False, platform="all"):
@@ -39,14 +45,14 @@ def build(root, output, version, *, include_account=False, platform="all"):
         raise ValueError("Некорректная версия релиза.")
     if output.exists() or output.is_symlink():
         raise ValueError("Архив уже существует; перезапись запрещена.")
-    if platform not in {'all', 'macos', 'windows'}:
+    if platform not in {'all', 'macos', 'windows', 'linux'}:
         raise ValueError('Неизвестная платформа архива.')
     selected = [p for p in ROOT_FILES if not (
-        platform == 'macos' and p.endswith('.bat')
-        or platform == 'windows' and p == 'start.command')]
+        platform in {'macos', 'linux'} and p.endswith('.bat')
+        or platform in {'windows', 'linux'} and p == 'start.command')]
     paths = [root / p for p in selected]
     source = root / "src/sarex_loader"
-    paths += sorted(source.glob("*.py"))
+    paths += sorted(p for p in source.glob("*.py") if p.stem not in DEVELOPER_MODULES)
     paths += [source / "profile-routes.toml", source / "browser_extension.js"]
     if any(p.is_symlink() or not p.is_file() for p in paths):
         raise ValueError("Файл поставки отсутствует или является ссылкой.")
@@ -86,9 +92,9 @@ def build(root, output, version, *, include_account=False, platform="all"):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Создать клиентский ZIP без рабочих данных.")
-    parser.add_argument("--version", default="v0.1.0-rc.6")
+    parser.add_argument("--version", default=RELEASE_VERSION)
     parser.add_argument("--output", type=Path, required=True)
-    parser.add_argument("--platform", choices=("all", "macos", "windows"), default="all")
+    parser.add_argument("--platform", choices=("all", "macos", "windows", "linux"), default="all")
     parser.add_argument(
         "--include-account",
         action="store_true",

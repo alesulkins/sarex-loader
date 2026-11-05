@@ -72,3 +72,4 @@ __pycache__/
 !/tests/test_api_client.py
 !/tests/test_https_transport.py
 !/tests/test_customer_portable.py
+!/tests/test_delivery_manifest.py

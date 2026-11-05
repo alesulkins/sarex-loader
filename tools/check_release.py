@@ -10,7 +10,7 @@ import tempfile
 from pathlib import Path
 from zipfile import ZipFile
 
-from build_release import build
+from build_release import RELEASE_VERSION, build
 
 
 def execute_logged(output, name, args, **kwargs):
@@ -61,12 +61,12 @@ runpy.run_module('sarex_loader', run_name='__main__', alter_sys=True)
 
 def run(output):
     output.parent.mkdir(parents=True, exist_ok=True)
-    platform = 'windows' if os.name == 'nt' else 'macos'
+    platform = 'windows' if os.name == 'nt' else 'macos' if sys.platform == 'darwin' else 'linux'
     with tempfile.TemporaryDirectory(prefix='sarex-release-') as temporary:
         root = Path(temporary).resolve()
         archive = root / 'customer.zip'
         result = build(Path(__file__).resolve().parents[1], archive,
-                       'v0.1.0-rc.6', platform=platform)
+                       RELEASE_VERSION, platform=platform)
         with ZipFile(archive) as package:
             if package.testzip() is not None:
                 raise RuntimeError('Corrupt release archive')
@@ -94,12 +94,24 @@ def run(output):
                     or marker.stat().st_mtime_ns != installed):
                 raise RuntimeError('Native BAT launcher failed; see release-bat-stderr.txt '
                                    'and release-bat-stdout.txt')
-        delivered = output.parent / f'sarex-loader-v0.1.0-rc.6-{platform}.zip'
+        demo_dir = root / 'offline-check'
+        demo = execute_logged(output, 'release-offline',
+                              [str(python), 'tools/mock_demo.py', str(demo_dir)],
+                              cwd=extracted, timeout=60)
+        if demo.returncode:
+            raise RuntimeError('Offline upload from customer ZIP failed; see release-offline logs')
+        evidence = json.loads((demo_dir / 'result.json').read_text(encoding='utf-8'))
+        if (evidence['real_sarex_requests'] != 0
+                or evidence['simulated_posts_repeat'] != 0
+                or evidence['synthetic_documents_created'] != 1):
+            raise RuntimeError('Unexpected offline upload result')
+        delivered = output.parent / f'sarex-loader-{RELEASE_VERSION}-{platform}.zip'
         with delivered.open('xb') as stream, archive.open('rb') as source:
             shutil.copyfileobj(source, stream)
         result = {k: v for k, v in result.items() if k != 'file'}
         result.update(clean_install=True, cli_help=True, production_load_requires_consent=True,
                       sarex_requests=0, native_upload_tested=False,
+                      offline_upload_from_archive=True,
                       native_bat_install_and_repeat=os.name == 'nt')
         with output.open('x', encoding='utf-8') as stream:
             json.dump(result, stream, indent=2)
