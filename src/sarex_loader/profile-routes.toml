@@ -1,0 +1,281 @@
+# Подтверждения пользователя 05.11.2026: docs/ROUTING_CONFIRMATIONS.md.
+# Только точные значения Excel и выбранный офис. Никакого поиска по подстроке.
+# Нет подтверждённой схемы — пропуск; неизвестные подрядчики не объединяются.
+# РТИ-Строй != РТ-Инжиниринг; МОСТ/МАД/ПАД и ОВН/ОПВ/ГТС/НК разделены.
+
+mode = "tree-recovery"
+input_root = "input"
+filename_separator = "-"
+url_contract_confirmed = true
+
+[[registries]]
+excel = "registry-sk.xlsx"
+inspection_type = "sk"
+root_id = "2066367"
+
+[registries.office_folders]
+"ОФ" = "01-ОФ"
+"ИиТС (И)" = "04-ИиТС (И)"
+"ИиТС (ТС)" = "03-ИиТС (ТС)"
+"ТЭЦ" = "02-ТЭЦ"
+"МГ" = "06-МГ"
+
+[registries.contractor_folders]
+"ООО \"РТ-Инжиниринг\"" = "РТИ"
+"ООО \"Хедмайнер\" (ОВН)" = "Хедмайнер (ОВН)"
+"ООО \"Хедмайнер\" (ОПВ, ПАД)" = "ФН Сервис (ОПВ, ПАД) _ Хедмайнер (ОПВ, ПАД)"
+"АО \"ИНТЕРТЕХЭЛЕКТРО\"" = "ИТЭ"
+"АО \"ИНТЕРТЕХЭЛЕКТРО\" (МС и ОС)" = "ИТЭ"
+"РСУ. МГ (ЧГРК)" = "РСУ. МГ (ЧГРК)"
+"ООО ХК \"Новолекс\" (МГ)" = "ХК Новолекс (МГ)"
+"РСУ. ГТС (ЧГРК)" = "РСУ. ГТС (ЧГРК)"
+"ЗАО \"КРОК инкорпорейтед\" (ИТ и СС)" = "КРОК (ИТИиСС)"
+"РСУ (ЧГРК)" = "РСУ (ЧГРК)"
+"РСУ. ОС (ЧГРК)" = "РСУ. ОС (ЧГРК)"
+"ООО \"Сфера\"" = "СФЕРА"
+"РСУ. ПППТС (ЧГРК)" = "РСУ. ПППТС (ЧГРК)"
+"ООО \"БиДжи ИНЖИНИРИНГ\" (ВЖК)" = "ООО БиДжиИнжиниринг"
+"ООО \"СОЮЗМАШ-ИНЖИНИРИНГ\"" = "СМИ"
+"ООО \"НерудТрейдГрупп\" (ПАД)" = "ООО Неруд Трейд Групп (ПАД)"
+"ООО \"НЕРУД ТРЕЙД ГРУПП\" (ПАД)" = "ООО Неруд Трейд Групп (ПАД)"
+"ООО \"Энергосервис\" ГТМ (МГ)" = "ООО Энергосервис"
+"ООО \"БиДжи ИНЖИНИРИНГ\"" = "БиДжи Инжиниринг"
+"ООО \"БиДжи ИНЖИНИРИНГ\" (МГ)" = "БиДжи Инжиниринг"
+"ООО \"ЮСР\"" = "ООО ЮСР"
+"ООО \"ЮСР\" (МГ)" = "ООО ЮСР"
+"ООО \"Хедмайнер\" (НК)" = "Хедмайнер (НК) (р.Шуман)"
+"ООО \"СК \"ТаймырСтройМонтаж\"" = "ТСМ"
+
+[[registries.folder_routes]]
+office = "01-ОФ"
+contractor = "РТИ"
+components = ["{office}", "{contractor}", "Инспекции", "{month}"]
+
+[[registries.folder_routes]]
+office = "04-ИиТС (И)"
+contractor = "Хедмайнер (ОВН)"
+components = ["{office}", "{contractor}", "{month}"]
+
+[[registries.folder_routes]]
+office = "03-ИиТС (ТС)"
+contractor = "ФН Сервис (ОПВ, ПАД) _ Хедмайнер (ОПВ, ПАД)"
+components = ["{office}", "{contractor}", "Инспекции", "{month}"]
+
+[[registries.folder_routes]]
+office = "02-ТЭЦ"
+contractor = "ИТЭ"
+components = ["{office}", "Инспекции", "{month}"]
+
+[[registries.folder_routes]]
+office = "06-МГ"
+contractor = "РСУ. МГ (ЧГРК)"
+components = ["{office}", "Инспекции", "{contractor}", "{month}"]
+
+[[registries.folder_routes]]
+office = "06-МГ"
+contractor = "ХК Новолекс (МГ)"
+components = ["{office}", "Инспекции", "{contractor}", "{month}"]
+
+[[registries.folder_routes]]
+office = "03-ИиТС (ТС)"
+contractor = "РСУ. ГТС (ЧГРК)"
+components = ["{office}", "{contractor}", "Инспекции", "{month}"]
+
+[[registries.folder_routes]]
+office = "04-ИиТС (И)"
+contractor = "РСУ (ЧГРК)"
+components = ["{office}", "{contractor}", "Инспекции", "{month}"]
+
+[[registries.folder_routes]]
+office = "04-ИиТС (И)"
+contractor = "РСУ. ОС (ЧГРК)"
+components = ["{office}", "РСУ (ЧГРК)", "Инспекции", "{month}"]
+
+[[registries.folder_routes]]
+office = "04-ИиТС (И)"
+contractor = "СФЕРА"
+components = ["{office}", "{contractor}", "Инспекции", "{month}"]
+months = ["2026-09"]
+
+[[registries.folder_routes]]
+office = "04-ИиТС (И)"
+contractor = "СФЕРА"
+components = ["{office}", "{contractor}", "Инспекции", "2026-09", "{month}"]
+months = ["2026-03", "2026-04", "2026-05", "2026-06", "2026-08"]
+
+[[registries.folder_routes]]
+office = "03-ИиТС (ТС)"
+contractor = "РСУ. ПППТС (ЧГРК)"
+components = ["{office}", "{contractor}", "Инспекции", "{month}"]
+
+[[registries.folder_routes]]
+office = "04-ИиТС (И)"
+contractor = "ООО БиДжиИнжиниринг"
+components = ["{office}", "{contractor}", "Инспекции", "{month}"]
+
+[[registries.folder_routes]]
+office = "04-ИиТС (И)"
+contractor = "СМИ"
+components = ["{office}", "{contractor}", "Инспекции", "{month}"]
+
+[[registries.folder_routes]]
+office = "03-ИиТС (ТС)"
+contractor = "ООО Неруд Трейд Групп (ПАД)"
+components = ["{office}", "{contractor}", "Инспекции", "{month}"]
+
+[[registries.folder_routes]]
+office = "06-МГ"
+contractor = "ООО Энергосервис"
+components = ["{office}", "Инспекции", "{contractor}", "{month}"]
+
+[[registries.folder_routes]]
+office = "06-МГ"
+contractor = "БиДжи Инжиниринг"
+components = ["{office}", "Инспекции", "{contractor}", "{month}"]
+
+[[registries.folder_routes]]
+office = "06-МГ"
+contractor = "ООО ЮСР"
+components = ["{office}", "Инспекции", "{contractor}", "{month}"]
+
+[[registries.folder_routes]]
+office = "03-ИиТС (ТС)"
+contractor = "Хедмайнер (НК) (р.Шуман)"
+components = ["{office}", "{contractor}", "Инспекции", "{month}"]
+
+[[registries.folder_routes]]
+office = "04-ИиТС (И)"
+contractor = "ТСМ"
+components = ["{office}", "{contractor}", "Инспекции", "{month}"]
+
+[[registries]]
+excel = "registry-vk.xlsx"
+inspection_type = "vk"
+root_id = "2067117"
+
+[registries.office_folders]
+"ОФ" = "01-ОФ"
+"ИиТС (И)" = "04-ППИ/ИиТС(И)"
+"ТЭЦ" = "02-ТЭЦ"
+"МГ" = "06-МГ"
+"ИиТС (ТС)" = "03-ОГР/ИиТС(ТС)"
+
+[registries.contractor_folders]
+"ООО \"РТ-Инжиниринг\"" = "РТ-Инжиниринг"
+"ООО \"Хедмайнер\" (ОВН)" = "ФН Сервис (ОВН)/Хедмайнер (ОВН)"
+"АО \"ИНТЕРТЕХЭЛЕКТРО\"" = "ИТЭ"
+"АО \"ИНТЕРТЕХЭЛЕКТРО\" (МС и ОС)" = "ИТЭ"
+"РСУ. МГ (ЧГРК)" = "РСУ.МГ"
+"ООО ХК \"Новолекс\" (МГ)" = "ХК Новолекс (МГ)"
+"ООО \"РТИ-Строй\"" = "РТИ-Строй"
+"РСУ (ЧГРК)" = "РСУ (ЧГРК)"
+"РСУ. ОС (ЧГРК)" = "РСУ. ОС (ЧГРК)"
+"РСУ. ГТС (ЧГРК)" = "РСУ. ГТС (ЧГРК)"
+"ЗАО \"КРОК инкорпорейтед\" (ИТ и СС)" = "КРОК (ИТИиСС)"
+"ООО \"Сфера\"" = "Сфера"
+"ООО \"Хедмайнер\" (ОПВ, ПАД)" = "ФН Сервис (ОПВ, ПАД)/Хедмайнер (ОПВ, ПАД)"
+"ООО \"Хедмайнер\"" = "ФН Сервис (ОПВ, ПАД)/Хедмайнер (ОПВ, ПАД)"
+"ООО \"ФН Сервис\" (ОВН)" = "ФН Сервис (ОВН)/Хедмайнер (ОВН)"
+"ООО \"СОЮЗМАШ-ИНЖИНИРИНГ\"" = "СМИ"
+"РСУ. ПППТС (ЧГРК)" = "РСУ.ППТС (ЧГРК)"
+"ООО \"БиДжи ИНЖИНИРИНГ\"" = "ООО БиДжи Инжиниринг"
+"ООО \"БиДжи ИНЖИНИРИНГ\" (МГ)" = "ООО БиДжи Инжиниринг"
+"ООО \"ЮСР\"" = "ООО ЮСР"
+"ООО \"ЮСР\" (МГ)" = "ООО ЮСР"
+"ООО НПО \"СиТЭК\"" = "ООО НПО СиТЭК"
+
+[[registries.folder_routes]]
+office = "01-ОФ"
+contractor = "РТ-Инжиниринг"
+components = ["{office}", "{contractor}", "{month}"]
+
+[[registries.folder_routes]]
+office = "04-ППИ/ИиТС(И)"
+contractor = "ФН Сервис (ОВН)/Хедмайнер (ОВН)"
+components = ["{office}", "{contractor}", "{month}"]
+
+[[registries.folder_routes]]
+office = "02-ТЭЦ"
+contractor = "ИТЭ"
+components = ["{office}", "{month}"]
+
+[[registries.folder_routes]]
+office = "06-МГ"
+contractor = "РСУ.МГ"
+components = ["{office}", "{contractor}", "{month}"]
+
+[[registries.folder_routes]]
+office = "06-МГ"
+contractor = "ХК Новолекс (МГ)"
+components = ["{office}", "{month}"]
+
+[[registries.folder_routes]]
+office = "04-ППИ/ИиТС(И)"
+contractor = "РСУ (ЧГРК)"
+components = ["{office}", "РСУ (ЧГРК)", "{month}"]
+
+[[registries.folder_routes]]
+office = "04-ППИ/ИиТС(И)"
+contractor = "РСУ. ОС (ЧГРК)"
+components = ["{office}", "РСУ (ЧГРК)", "{month}"]
+
+[[registries.folder_routes]]
+office = "04-ППИ/ИиТС(И)"
+contractor = "РСУ. ГТС (ЧГРК)"
+components = ["{office}", "РСУ (ЧГРК)", "{month}"]
+
+[[registries.folder_routes]]
+office = "04-ППИ/ИиТС(И)"
+contractor = "Сфера"
+components = ["{office}", "{contractor}", "{month}"]
+
+[[registries.folder_routes]]
+office = "03-ОГР/ИиТС(ТС)"
+contractor = "ФН Сервис (ОПВ, ПАД)/Хедмайнер (ОПВ, ПАД)"
+components = ["{office}", "{contractor}", "{month}"]
+
+[[registries.folder_routes]]
+office = "04-ППИ/ИиТС(И)"
+contractor = "СМИ"
+components = ["{office}", "{contractor}", "{month}"]
+
+[[registries.folder_routes]]
+office = "03-ОГР/ИиТС(ТС)"
+contractor = "РСУ.ППТС (ЧГРК)"
+components = ["{office}", "{contractor}", "{month}"]
+
+[[registries.folder_routes]]
+office = "03-ОГР/ИиТС(ТС)"
+contractor = "РСУ. ГТС (ЧГРК)"
+components = ["{office}", "РСУ.ГТС (ЧГРК)", "{month}"]
+
+[[registries.folder_routes]]
+office = "06-МГ"
+contractor = "ООО БиДжи Инжиниринг"
+components = ["{office}", "{contractor}", "{month}"]
+
+[[registries.folder_routes]]
+office = "06-МГ"
+contractor = "ООО НПО СиТЭК"
+components = ["{office}", "{month}"]
+
+[[registries.folder_routes]]
+office = "06-МГ"
+contractor = "ООО ЮСР"
+components = ["{office}", "{contractor}", "{month}"]
+
+[tree]
+source = "gateway"
+disk_id = "25cbff03-454d-4b6c-aeb6-2808c3a2b68b"
+root_ids = [2066367, 2067117]
+max_folders = 200
+
+# Seven exact, user-authorized mappings, 2026-11-04. No fuzzy/global number cleanup.
+[filename_numbers.sk]
+"2026-09-10-ОК-РТИ-КГ от ККД до СКДР-Инспекционный-3480.pdf" = "3480 ОФ"
+"2026-09-10-ОК-РТИ-КОК-Инспекционный-3476.pdf" = "3476 ОФ"
+"2026-09-14-ОК-РТИ-ГК-Инспекционный-3555.pdf" = "3555 ОФ"
+"2026-09-03-ОК-РТИ-КСХП-Инспекционный-3495.pdf" = "3495 ОФ"
+"2026-09-13-ОК-РТИ-ГК-Инспекционный-3532.pdf" = "3532 ОФ"
+"2026-09-14-ОК-РТИ-СКДР-Инспекционный-3559.pdf" = "3559 ОФ"
+"2026-09-14-Хедмайнер-ОВН-Инспекционный-35804,.pdf" = "35804"

@@ -1,0 +1,9 @@
+* text=auto
+*.py text eol=lf
+*.toml text eol=lf
+*.js text eol=lf
+*.command text eol=lf
+*.bat text eol=crlf
+.gitignore text eol=lf
+.gitattributes text eol=lf
+MANIFEST.in text eol=lf

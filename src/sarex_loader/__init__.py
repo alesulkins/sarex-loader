@@ -1,0 +1,1 @@
+"""Local registry audits: no network, credentials or business-data writes."""

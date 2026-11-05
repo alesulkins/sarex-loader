@@ -1,0 +1,47 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "sarex-loader"
+version = "0.1.0"
+description = "Sarex inspection PDF routing and Excel URL recovery"
+readme = {text = "Sarex Loader. Run start.bat on Windows or start.command on macOS. Python 3.11+ is required. Production upload and folder creation remain disabled pending acceptance.", content-type = "text/plain"}
+requires-python = ">=3.11"
+dependencies = ["openpyxl>=3.1.5,<3.2"]
+
+[project.optional-dependencies]
+dev = ["pytest>=8,<10", "ruff>=0.9,<1"]
+browser = ["playwright>=1.64.1,<1.65"]
+
+[project.scripts]
+sarex-loader = "sarex_loader.cli:main"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+include-package-data = false
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["sarex_loader", "sarex_loader.*"]
+
+[tool.setuptools.package-data]
+sarex_loader = ["browser_extension.js", "profile-routes.toml"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+addopts = "-ra"
+
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+src = ["src", "tests"]
+# Private run artifacts include historical diagnostic scripts; preserve them verbatim.
+extend-exclude = ["outputs"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "S"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*.py" = ["S101"]

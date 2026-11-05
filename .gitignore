@@ -1,0 +1,43 @@
+# Customer repository: runtime, routing configuration and launchers only.
+# Everything else remains local unless explicitly added to this allowlist.
+/*
+!/.gitignore
+!/.gitattributes
+!/pyproject.toml
+!/MANIFEST.in
+!/customer.routes.toml
+!/start.py
+!/start.bat
+!/start.command
+!/setup.bat
+!/start-upload.bat
+!/start-fill-urls.bat
+!/src/
+/src/*
+!/src/sarex_loader/
+/src/sarex_loader/*
+!/src/sarex_loader/*.py
+!/src/sarex_loader/profile-routes.toml
+!/src/sarex_loader/browser_extension.js
+
+# Credentials, customer inputs and runtime state are never distributed.
+__pycache__/
+*.py[cod]
+.env
+.env.*
+*.pem
+*.key
+*.p12
+*.pfx
+settings.toml
+*.local.toml
+*.sqlite*
+*.db
+*.xlsx
+*.xls
+*.xlsm
+*.pdf
+*.docx
+*.log
+*.bak
+.DS_Store
