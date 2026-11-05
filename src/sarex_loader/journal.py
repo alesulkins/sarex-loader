@@ -1,4 +1,4 @@
-"""Private POSIX SQLite checkpoints; storage never grants permission for network effects."""
+"""Private SQLite checkpoints for POSIX and Windows; no network authorization."""
 
 import hashlib
 import json
@@ -56,6 +56,10 @@ def fingerprint(value: object) -> str:
     return hashlib.sha256(canonical(value).encode()).hexdigest()
 
 
+def _windows_platform():
+    return os.name == 'nt'
+
+
 class Journal:
     """One private directory/plan, one advisory process lock, FULL durable commits.
 
@@ -64,10 +68,8 @@ class Journal:
     """
 
     def __init__(self, path: Path, input_roots: list[Path]):
-        if os.name == 'nt':
-            raise ValidationError('Старый режим upload с POSIX-журналом недоступен на Windows. '
-                                  'Используйте клиентский просмотр; запись Sarex запрещена.')
         self._stack = ExitStack()
+        self._storage = None
         self._db = None
         self._failed = False
         self.path = local_path(path).absolute()
@@ -76,34 +78,7 @@ class Journal:
                                   for root in input_roots):
             raise ValidationError('Журнал должен быть отдельно от входных каталогов.')
         try:
-            parent = self._stack.enter_context(directory_fd(self.path.parent))
-            # Private leaf permissions alone do not prevent another user from renaming
-            # it through a writable ancestor. Root-owned sticky /tmp is a safe exception.
-            for ancestor in (*reversed(self.path.parent.parents), self.path.parent):
-                info = ancestor.lstat()
-                if (info.st_uid not in {0, os.getuid()}
-                        or info.st_mode & 0o022 and not info.st_mode & stat.S_ISVTX):
-                    raise ValidationError('Нужны защищённые родительские каталоги журнала.')
-            try:
-                os.mkdir(self.path.name, 0o700, dir_fd=parent)
-                os.fsync(parent)
-            except FileExistsError:
-                pass
-            self._directory = self._stack.enter_context(directory_fd(self.path))
-            info = os.fstat(self._directory)
-            if info.st_uid != os.getuid() or stat.S_IMODE(info.st_mode) != 0o700:
-                raise ValidationError('Нужен собственный приватный каталог журнала с правами 0700.')
-            self._directory_identity = (info.st_dev, info.st_ino)
-            self._check_files()
-            lock = self._open_private('process.lock')
-            self._stack.callback(os.close, lock)
-            lock_file(lock)
-            self._check_files()
-            new = not (self.path / 'journal.sqlite').exists()
-            db_fd = self._open_private('journal.sqlite')
-            self._stack.callback(os.close, db_fd)
-            self._db_identity = os.fstat(db_fd).st_ino
-            self._verify_directory()
+            new = self._prepare_storage()
             uri = (self.path / 'journal.sqlite').as_uri() + '?mode=rw'
             self._db = sqlite3.connect(uri, uri=True, timeout=BUSY_TIMEOUT_MS / 1000,
                                        isolation_level=None)
@@ -124,7 +99,7 @@ class Journal:
                     for statement in SCHEMA.values():
                         self._db.execute(statement)
                     self._db.execute("INSERT INTO meta VALUES ('schema', '1')")
-                os.fsync(self._directory)
+                self._sync_directory()
             else:
                 self._validate_database()
                 self._db.execute('PRAGMA journal_mode=PERSIST')
@@ -141,12 +116,54 @@ class Journal:
             self._stack.close()
             raise
 
+    def _prepare_storage(self):
+        if _windows_platform():
+            from sarex_loader.windows_journal import WindowsJournalStorage
+
+            self._storage = WindowsJournalStorage(self.path, self._stack, MAX_DB_BYTES)
+            return self._storage.new
+        parent = self._stack.enter_context(directory_fd(self.path.parent))
+        # Private leaf permissions alone do not prevent another user from renaming
+        # it through a writable ancestor. Root-owned sticky /tmp is a safe exception.
+        for ancestor in (*reversed(self.path.parent.parents), self.path.parent):
+            info = ancestor.lstat()
+            if (info.st_uid not in {0, os.getuid()}
+                    or info.st_mode & 0o022 and not info.st_mode & stat.S_ISVTX):
+                raise ValidationError('Нужны защищённые родительские каталоги журнала.')
+        try:
+            os.mkdir(self.path.name, 0o700, dir_fd=parent)
+            os.fsync(parent)
+        except FileExistsError:
+            pass
+        self._directory = self._stack.enter_context(directory_fd(self.path))
+        info = os.fstat(self._directory)
+        if info.st_uid != os.getuid() or stat.S_IMODE(info.st_mode) != 0o700:
+            raise ValidationError('Нужен собственный приватный каталог журнала с правами 0700.')
+        self._directory_identity = (info.st_dev, info.st_ino)
+        self._check_files()
+        lock = self._open_private('process.lock')
+        self._stack.callback(os.close, lock)
+        lock_file(lock)
+        self._check_files()
+        new = not (self.path / 'journal.sqlite').exists()
+        db_fd = self._open_private('journal.sqlite')
+        self._stack.callback(os.close, db_fd)
+        self._db_identity = os.fstat(db_fd).st_ino
+        self._verify_directory()
+        return new
+
+    def _sync_directory(self):
+        if self._storage is not None:
+            self._storage.sync()
+        else:
+            os.fsync(self._directory)
+
     def _open_private(self, name: str) -> int:
         try:
             fd = os.open(name, os.O_RDWR | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW,
                          0o600, dir_fd=self._directory)
             try:
-                os.fsync(self._directory)
+                self._sync_directory()
             except BaseException:
                 os.close(fd)
                 raise
@@ -160,6 +177,8 @@ class Journal:
         return fd
 
     def _check_files(self) -> None:
+        if self._storage is not None:
+            return self._storage.check_files()
         allowed = {'process.lock', 'journal.sqlite', 'journal.sqlite-journal'}
         with os.scandir(self._directory) as entries:
             for entry in entries:
@@ -170,6 +189,8 @@ class Journal:
                     raise ValidationError('Неожиданный или небезопасный файл в каталоге журнала.')
 
     def _verify_directory(self) -> None:
+        if self._storage is not None:
+            return self._storage.verify()
         with directory_fd(self.path) as fd:
             info = os.fstat(fd)
             if (info.st_dev, info.st_ino) != self._directory_identity:
@@ -256,7 +277,7 @@ class Journal:
             self._db.execute('BEGIN IMMEDIATE')
             yield
             self._db.execute('COMMIT')
-            os.fsync(self._directory)
+            self._sync_directory()
         except BaseException:
             self._failed = True
             if self._db.in_transaction:
@@ -302,9 +323,13 @@ class Journal:
         """Locked RAM snapshot for preview; no SQLite recovery/writes on the source."""
         from sarex_loader.file_safety import read_snapshot
 
-        if os.name == 'nt':
-            raise ValidationError('Исторический POSIX-журнал на Windows не открывается. '
-                                  'Клиентский просмотр не требует SQLite.')
+        if _windows_platform():
+            from sarex_loader.windows_journal import WindowsJournalStorage
+
+            with ExitStack() as stack:
+                storage = WindowsJournalStorage(local_path(path).absolute(), stack,
+                                                MAX_DB_BYTES, read_only=True)
+                return cls._peek_snapshot(storage.snapshot)
 
         with directory_fd(path) as fd:
             if (stat.S_IMODE(os.fstat(fd).st_mode) != 0o700
@@ -314,28 +339,35 @@ class Journal:
             try:
                 lock_file(lock, shared=True)
                 obj = cls.__new__(cls)
+                obj._storage = None
                 obj._directory = fd
                 obj._check_files()
-                sidecar = path / 'journal.sqlite-journal'
-                if sidecar.exists():
-                    raw = read_snapshot(sidecar, MAX_DB_BYTES)
-                    if raw and (len(raw) < 28 or raw[:28] != b'\0' * 28):
-                        raise ValidationError('JOURNAL_RECOVERY_REQUIRED')
-                obj._db = sqlite3.connect(':memory:')
-                try:
-                    obj._db.deserialize(read_snapshot(path / 'journal.sqlite', MAX_DB_BYTES))
-                    obj._db.execute('PRAGMA trusted_schema=OFF')
-                    obj._db.execute('PRAGMA query_only=ON')
-                    obj._validate_database()
-                    context = obj._db.execute(
-                        "SELECT value FROM meta WHERE key='context'").fetchone()
-                    operations = {k: json.loads(v) for k, v in obj._db.execute(
-                        'SELECT key,payload FROM operations')}
-                    return (context[0] if context else None), operations, obj.checkpoints()
-                finally:
-                    obj._db.close()
+                return cls._peek_snapshot(lambda name: read_snapshot(path / name, MAX_DB_BYTES)
+                                          if (path / name).exists() else b'')
             finally:
                 os.close(lock)
+
+    @classmethod
+    def _peek_snapshot(cls, read):
+        try:
+            raw = read('journal.sqlite-journal')
+        except FileNotFoundError:
+            raw = b''
+        if raw and (len(raw) < 28 or raw[:28] != b'\0' * 28):
+            raise ValidationError('JOURNAL_RECOVERY_REQUIRED')
+        obj = cls.__new__(cls)
+        obj._db = sqlite3.connect(':memory:')
+        try:
+            obj._db.deserialize(read('journal.sqlite'))
+            obj._db.execute('PRAGMA trusted_schema=OFF')
+            obj._db.execute('PRAGMA query_only=ON')
+            obj._validate_database()
+            context = obj._db.execute("SELECT value FROM meta WHERE key='context'").fetchone()
+            operations = {k: json.loads(v) for k, v in obj._db.execute(
+                'SELECT key,payload FROM operations')}
+            return (context[0] if context else None), operations, obj.checkpoints()
+        finally:
+            obj._db.close()
 
     def mark_document_url_checked(self, key: str, document_id: int) -> None:
         """GET identity evidence only; never promote UNKNOWN or imply a Bundle link."""
