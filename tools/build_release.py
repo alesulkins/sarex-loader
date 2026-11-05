@@ -37,7 +37,7 @@ DEVELOPER_MODULES = frozenset({
     'read_only_api', 'target_diagnostics', 'target_response_trace', 'test_disk_config',
     'test_target_check', 'token_response_diagnostic',
 })
-RELEASE_VERSION = 'v0.1.0-rc.7'
+RELEASE_VERSION = 'v0.1.0-rc.8'
 
 
 def build(root, output, version, *, include_account=False, platform="all"):

@@ -73,3 +73,4 @@ __pycache__/
 !/tests/test_https_transport.py
 !/tests/test_customer_portable.py
 !/tests/test_delivery_manifest.py
+!/tests/test_folder_toggle.py

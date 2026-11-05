@@ -38,7 +38,8 @@ jobs:
               'tests/test_console_encoding.py', 'tests/test_windows_metadata_identity.py',
               'tests/test_windows_security_regressions.py', 'tests/test_production_upload.py',
               'tests/test_api_client.py', 'tests/test_https_transport.py',
-              'tests/test_customer_portable.py', 'tests/test_delivery_manifest.py'
+              'tests/test_customer_portable.py', 'tests/test_delivery_manifest.py',
+              'tests/test_folder_toggle.py'
             ]);
             const commit = await github.rest.repos.getCommit({...context.repo, ref: context.sha});
             const tree = await github.rest.git.getTree({
@@ -92,6 +93,9 @@ jobs:
       - name: Customer archive contents and import closure
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         run: python -m pytest -q tests/test_delivery_manifest.py --junitxml=validation-results/delivery.xml
+      - name: Optional month creation (synthetic HTTPS only)
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: python -m pytest -q tests/test_folder_toggle.py --junitxml=validation-results/folders.xml
       - name: Native Windows guards (no skips allowed on Windows)
         if: ${{ !cancelled() && steps.install.outcome == 'success' && runner.os == 'Windows' }}
         run: python -m pytest -q tests/test_windows_native.py --junitxml=validation-results/windows.xml

@@ -112,7 +112,9 @@ def execute_with_reports(worker, command, profile, excel, root_url, results, set
         lines += ['', 'Подробный ход работы: [журнал.txt](журнал.txt).',
                   'Технические данные и checkpoint: [технические-данные.zip]'
                   '(технические-данные.zip).',
-                  ('Создание папок отключено. Результаты отправок и пропусков — в отчёте.'
+                  ('Результаты отправок, пропусков и создания папок — в отчётах. '
+                   'Создано папок: ' + str(sum(p['status'] == 'CREATED'
+                                             for p in report.get('folders', []))) + '.'
                    if command == 'load' else 'Записи в Sarex и создание папок не выполнялись.'),
                   ('Запуск остановлен; журнал не сбрасывайте.' if report.get('stopped') else
                    'План отменён пользователем.' if report.get('cancelled') else ''), '']

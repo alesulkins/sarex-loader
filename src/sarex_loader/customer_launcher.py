@@ -7,11 +7,14 @@ from sarex_loader.console import configure_console
 from sarex_loader.messages import describe
 from sarex_loader.profile_workflow import run_profile
 from sarex_loader.safety import ValidationError
-from sarex_loader.user_settings import require_settings, root_id_from_url, setup
+from sarex_loader.user_settings import folder_setting, require_settings, root_id_from_url, setup
 
 HELP = '''Sarex Loader — отдельный запуск для СК (sk) или ВК (vk).
 
 sarex-loader -setup          Сохранить/изменить локальные логин и пароль.
+sarex-loader -folders on     Разрешить создание месячных папок после подтверждения.
+sarex-loader -folders off    Выключить создание папок (значение по умолчанию).
+sarex-loader -folders status Показать текущую настройку создания папок.
 sarex-loader -preview sk     Проверить Excel и PDF СК, прочитать всё дерево СК.
 sarex-loader -preview vk     Проверить Excel и PDF ВК, прочитать всё дерево ВК.
 sarex-loader -load sk        Проверить план СК и запросить разрешение загрузки.
@@ -25,15 +28,28 @@ sarex-loader -test-pdf       Подготовить один тестовый PD
 sarex-loader -test-pdf --send SHA256  Отдельно подтвердить тестовую отправку.
 sarex-loader -help           Эта справка.
 
-Пути вводятся при запуске. -fill меняет только пустые URL в переданном Excel.
+Windows: вместо sarex-loader можно писать .\\start.bat
+macOS: вместо sarex-loader можно писать python3 start.py
+Команды выполняются из распакованной папки программы.
+
+Preview/load спросят: путь к Excel → папка PDF → ссылка на корень Sarex.
+Fill спросит только Excel и корень; PDF для него не нужны.
+-fill заполняет пустые URL в переданном Excel и сохраняет резервную копию.
+Предварительно закройте книгу в Excel; для проверки используйте её копию.
+-preview и -load --dry-run создают только отчёты: исходники и Sarex не меняются.
 Корень СК: https://lk.sarex.io/documentations/2066367
 Корень ВК: https://lk.sarex.io/documentations/2067117
 Preview показывает план перемещения в «не найдено», но ничего не перемещает.
 Подпапки PDF не обходятся. -load требует отдельного подтверждения плана перед записью.
-Создание папок отключено. -load перемещает доказанно отсутствующие номера в «не найдено».
-Для диагностики: sarex-loader -preview sk (флаг --no-move сохранён для совместимости).
+Создание папок по умолчанию выключено. -load перемещает отсутствующие номера в «не найдено».
+-load --no-move запрещает только перемещение PDF, но НЕ отправку разрешённых файлов.
+-folders on/off меняет настройку, а не создаёт папки прямо сейчас.
+При on рабочий -load отдельно спросит разрешение создать недостающие месяцы.
+После создания повторите -load для оставшихся PDF. Preview/fill/test-pdf папки не создают.
+Повторный -setup снова выключает создание. -folders status показывает настройку.
 Продолжение прерванного обхода: добавьте --resume "путь к checkpoint".
-Пример: sarex-loader -preview sk → Excel СК → папка PDF СК → ссылка СК → результаты.
+Отчёты появятся автоматически в Загрузках: отчет-дата-время. Сначала откройте ИТОГИ.md.
+Полная пошаговая инструкция и примеры — README.md рядом с start.py.
 '''
 
 
@@ -68,6 +84,11 @@ def main(argv=None):
         print(HELP)
         return 0
     try:
+        if argv[:1] == ['-folders']:
+            if len(argv) != 2:
+                raise ValidationError('Используйте -folders on, off или status.')
+            folder_setting(argv[1])
+            return 0
         if argv[:1] == ['-test-pdf']:
             from sarex_loader.customer_test import command as test_command
 

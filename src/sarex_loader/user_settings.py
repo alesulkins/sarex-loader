@@ -10,7 +10,7 @@ import stat
 import subprocess
 import tomllib
 import warnings
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 from uuid import uuid4
 
@@ -212,3 +212,21 @@ def require_settings(path=None):
     if not settings_configured(path):
         raise ValidationError('Сначала выполните sarex-loader -setup.')
     return load_settings(path)
+
+
+def folder_setting(action, *, path=None):
+    """Local switch only: no auth, GET, folder creation or secret output."""
+    if action not in {'on', 'off', 'status'}:
+        raise ValidationError('Используйте -folders on, -folders off или -folders status.')
+    if action == 'status' and not settings_configured(path):
+        print('Создание месячных папок: выключено (по умолчанию).')
+        return
+    settings = require_settings(path)
+    if action != 'status':
+        settings = replace(settings, allow_folder_creation=action == 'on')
+        save_settings(settings, path)
+    print('Создание месячных папок: ' + ('включено.' if settings.allow_folder_creation
+                                       else 'выключено.'))
+    if settings.allow_folder_creation:
+        print('Только при -load sk/vk и отдельном подтверждении списка. '
+              'Preview, dry-run и fill ничего в Sarex не создают.')

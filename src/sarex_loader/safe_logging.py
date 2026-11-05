@@ -15,6 +15,7 @@ class Event(Enum):
     API_ERROR = "api_error"
     API_READ_RESPONSE = 'api_read_response'
     API_SINGLE_TEST_RESPONSE = 'api_single_test_response'
+    API_FOLDER_RESPONSE = 'api_folder_response'
 
 
 MESSAGES = {
@@ -28,6 +29,7 @@ MESSAGES = {
     'api_read_response': 'Разрешённый read-only/auth ответ получен; право записи не предоставлено.',
     'api_single_test_response': (
         'Ответ одиночного тестового POST получен; нужна итоговая GET-сверка.'),
+    'api_folder_response': 'Ответ создания месячной папки получен; нужна итоговая GET-сверка.',
 }
 
 

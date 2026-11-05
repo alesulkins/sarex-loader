@@ -37,8 +37,6 @@ def _run_profile(command, profile, excel, root_url, results, settings, *, pdf=No
                 no_move=False, resume=None):
     if command not in ('preview', 'fill', 'load'):
         raise ValidationError('Неизвестная команда.')
-    if settings.allow_folder_creation:
-        raise ValidationError('Создание папок запрещено в этой поставке. Выполните -setup.')
     config = profile_config(profile, excel, root_url)
     results = checked_path(local_path(results), directory=True)
     protected = [config.root]
@@ -120,7 +118,7 @@ def _run_profile(command, profile, excel, root_url, results, settings, *, pdf=No
         if pending:
             print(f'Найдено кандидатов, ожидающих подтверждения полноты списка детей: {pending}. '
                   'Эти URL в копию не записаны.')
-    print('Создание папок отключено. Результат: ' + str(output))
+    print('Этот режим не создаёт папки Sarex. Результат: ' + str(output))
     report['output_directory'] = str(output)
     return report
 

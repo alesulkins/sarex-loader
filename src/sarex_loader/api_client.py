@@ -228,6 +228,7 @@ class SarexClient:
                  mock_writes_enabled: bool = False,
                  read_only_network_enabled: bool = False,
                  single_test_network_enabled: bool = False,
+                 folder_network_enabled: bool = False,
                  diagnostics_enabled: bool = False) -> None:
         if (not isinstance(settings, ApiSettings)
                 or token is not None and not isinstance(token, BearerToken)):
@@ -235,6 +236,9 @@ class SarexClient:
         if (type(mock_writes_enabled) is not bool or type(read_only_network_enabled) is not bool
                 or type(diagnostics_enabled) is not bool
                 or type(single_test_network_enabled) is not bool
+                or type(folder_network_enabled) is not bool
+                or folder_network_enabled and (single_test_network_enabled
+                                                or read_only_network_enabled or mock_writes_enabled)
                 or single_test_network_enabled and (
                     read_only_network_enabled or mock_writes_enabled)
                 or token is not None and token_provider is not None):
@@ -245,6 +249,7 @@ class SarexClient:
         self._mock_writes_enabled = mock_writes_enabled
         self._read_only_network_enabled = read_only_network_enabled
         self._single_test_network_enabled = single_test_network_enabled
+        self._folder_network_enabled = folder_network_enabled
         self._diagnostics_enabled = diagnostics_enabled
         self._response_diagnostic = {}
         self._transport = transport if transport is not None else DisabledTransport()
@@ -318,7 +323,7 @@ class SarexClient:
         return result
 
     def create_month_folder(self, *, disk_id: str, parent_id: int, name: str) -> Document:
-        """Swagger CreateDocumentRequest; not wired into any live CLI workflow.
+        """Swagger CreateDocumentRequest; guarded month-only workflow.
 
         The caller must establish completeness, exact parent and naming beforehand.
         Existing transport write/consent gates still apply. No POST retry.
@@ -380,7 +385,8 @@ class SarexClient:
         if not (method == 'GET' and get_route or method == 'POST' and (post_route or auth_route)):
             raise ValidationError('Метод или маршрут отсутствует в allowlist.')
         if method == 'POST' and not (
-                self._mock_writes_enabled or self._single_test_network_enabled):
+                self._mock_writes_enabled or self._single_test_network_enabled
+                or self._folder_network_enabled):
             raise ApiError(ApiErrorCode.WRITES_DISABLED)
         response = None
         error = None
@@ -390,6 +396,7 @@ class SarexClient:
         single = False
         try:
             if self._transport.network_enabled is not False:
+                from sarex_loader.folder_transport import FolderHTTPSTransport
                 from sarex_loader.https_transport import ReadOnlyHTTPSTransport
                 from sarex_loader.single_test_transport import SingleTestHTTPSTransport
 
@@ -397,7 +404,9 @@ class SarexClient:
                           and type(self._transport) is SingleTestHTTPSTransport)
                 readonly = (self._read_only_network_enabled
                             and type(self._transport) is ReadOnlyHTTPSTransport)
-                if not (single or readonly):
+                folder = (self._folder_network_enabled
+                          and type(self._transport) is FolderHTTPSTransport)
+                if not (single or readonly or folder):
                     raise ApiError(ApiErrorCode.NETWORK_DISABLED)
                 is_live = True
                 # Authorize BEFORE token refresh: rejected resource writes have no auth side effect.
@@ -493,7 +502,9 @@ class SarexClient:
             error.outcome_unknown |= method == 'POST' and attempted
             self._logger.warning(Event.API_ERROR.value)
             raise error
-        if is_live and self._single_test_network_enabled and method == 'POST':
+        if is_live and self._folder_network_enabled and method == 'POST':
+            event = Event.API_FOLDER_RESPONSE
+        elif is_live and self._single_test_network_enabled and method == 'POST':
             event = Event.API_SINGLE_TEST_RESPONSE
         else:
             event = Event.API_READ_RESPONSE if is_live else Event.API_RESPONSE

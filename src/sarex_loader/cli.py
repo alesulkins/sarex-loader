@@ -92,7 +92,8 @@ def build_parser() -> argparse.ArgumentParser:
 def main(argv: Sequence[str] | None = None) -> int:
     configure_console()
     supplied = list(sys.argv[1:] if argv is None else argv)
-    if supplied and supplied[0] in {'-setup', '-preview', '-load', '-fill', '-help', '-test-pdf'}:
+    if supplied and supplied[0] in {
+            '-setup', '-preview', '-load', '-fill', '-help', '-test-pdf', '-folders'}:
         from sarex_loader.customer_launcher import main as customer_main
 
         return customer_main(supplied)

@@ -5,7 +5,7 @@ import json
 import os
 import sys
 from collections import Counter
-from contextlib import redirect_stdout
+from contextlib import ExitStack, redirect_stdout
 from types import SimpleNamespace
 
 from sarex_loader.api_models import ApiError
@@ -142,6 +142,11 @@ def fresh_children(config, index, folder, provider):
 
 
 def run(config, index, report, pdf, excel, output, settings, *, no_move=False, ask=input):
+    from sarex_loader.folder_ledger import FolderLedger
+    from sarex_loader.folder_ledger import journal_path as folder_journal_path
+    from sarex_loader.production_folders import finish as finish_folders
+    from sarex_loader.production_folders import prepare_plans
+
     if not operational_tree(index):
         raise ValidationError("Нужен завершённый обход корня без ошибок GET и пропущенных веток.")
     protected = [excel.parent, pdf, journal_path()]
@@ -157,13 +162,28 @@ def run(config, index, report, pdf, excel, output, settings, *, no_move=False, a
         "cancelled": False,
         "receipts": [],
         "moves": [],
+        "folders": [],
     }
     backup = output.parent / (output.name + "-backups")
     backup.mkdir(mode=0o700)
-    with Journal(journal_path(), [excel.parent, pdf]) as journal:
+    with Journal(journal_path(), [excel.parent, pdf]) as journal, ExitStack() as stack:
+        folder_ledger = None
+        if settings.allow_folder_creation or folder_journal_path().exists():
+            folder_ledger = stack.enter_context(FolderLedger([excel.parent, pdf]))
         # Also checks unknown operations unrelated to the currently selected files/root.
         journal.register_production({})
         operations, selected = prepare_operations(config, index, report, pdf, journal)
+        folder_plans = (prepare_plans(config, index, report)
+                        if settings.allow_folder_creation else [])
+        if settings.allow_folder_creation:
+            eligible = {(p['parent_id'], p['month']) for p in folder_plans}
+            for plan in report.get('planned_folders', []):
+                plan['creation_blockers'] = [r for r in plan['creation_blockers']
+                                             if r != 'FOLDER_CREATION_DISABLED']
+                plan['creation_allowed'] = (plan['parent_id'], plan['month']) in eligible
+                if not plan['creation_allowed']:
+                    plan['creation_blockers'].append(
+                        'Нет PDF, прошедших все проверки для создания.')
         blocked_moves = {f["local_path"] for f in report["files"]
                          if f["status"] == "UPLOAD_SKIPPED"}
         moves = ([] if no_move else [m for m in report.get("local_move_plan", [])
@@ -309,6 +329,22 @@ def run(config, index, report, pdf, excel, output, settings, *, no_move=False, a
                         moves, output.parent / (output.name + "-moves"), protected=protected
                     )
         result["checkpoints"] = journal.checkpoints()
+        if folder_plans and not result['cancelled'] and not result['stopped']:
+            def verify_folder_sources():
+                if read_snapshot(excel, 64 * 1024**2) != snapshot:
+                    raise ValidationError('Excel изменился перед созданием папок.')
+                contents = {f['filename']: f for f in scan_pdfs(pdf)}
+                for file in report['files']:
+                    if (file.get('parent_id'), file.get('month')) not in {
+                            (p['parent_id'], p['month']) for p in folder_plans}:
+                        continue
+                    content = contents.get(file['filename'])
+                    if not content or content['reason'] or content['identity'] != file['identity']:
+                        raise ValidationError('PDF изменился перед созданием папки.')
+
+            result['folders'] = finish_folders(folder_plans, config, index, folder_ledger, settings,
+                                               verify_sources=verify_folder_sources, ask=ask)
+            result['stopped'] = any(p['status'] == 'OUTCOME_UNKNOWN' for p in result['folders'])
     for file in report["files"]:
         file["reason_description"] = "; ".join(describe(r) for r in file["reasons"])
     report.update(
@@ -319,6 +355,7 @@ def run(config, index, report, pdf, excel, output, settings, *, no_move=False, a
         write_enabled=not result["cancelled"],
         output_directory=str(output),
         local_moves_enabled=bool(result["moves"]),
+        folder_creation_enabled=settings.allow_folder_creation,
         local_moves_audit_directory=str(output.parent / (output.name + "-moves")),
     )
     report["counts"].update(
@@ -327,6 +364,12 @@ def run(config, index, report, pdf, excel, output, settings, *, no_move=False, a
         already_confirmed=result["already_confirmed"],
     )
     payloads = preview_payloads(report)
+    if result['folders']:
+        payloads['ПАПКИ.md'] = ('# Создание месячных папок\n\n'
+            + '\n'.join(f"- {p['full_path']} (parent_id={p['parent_id']}): {p['description']}"
+                        for p in result['folders'])
+            + '\n\nВ новые папки PDF в этом запуске не загружались. '
+            'После успешного создания повторите запуск.\n').encode()
     payloads["upload-result.json"] = json.dumps(result, ensure_ascii=False, indent=2).encode()
     _write_bundle(output, payloads, protected)
     return report
