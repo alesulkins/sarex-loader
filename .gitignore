@@ -40,3 +40,22 @@ __pycache__/
 *.log
 *.bak
 .DS_Store
+
+# Delivery documentation and synthetic platform checks.
+!/README.md
+!/RELEASE_NOTES.md
+!/.github/
+/.github/*
+!/.github/workflows/
+/.github/workflows/*
+!/.github/workflows/platform-validation.yml
+!/tools/
+/tools/*
+!/tools/mock_demo.py
+!/tools/platform_probe.py
+!/tools/build_release.py
+!/tests/
+/tests/*
+!/tests/__init__.py
+!/tests/test_windows_native.py
+!/tests/windows_journal_probe.py

@@ -1,0 +1,106 @@
+name: Windows and macOS validation
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  validate:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    steps:
+      # Deliberately no checkout: do not download account.toml or Git history.
+      - name: Download only approved source files
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const path = require('path');
+            const fixed = new Set([
+              'pyproject.toml', 'MANIFEST.in', 'customer.routes.toml', 'start.py',
+              'tools/platform_probe.py', 'src/sarex_loader/profile-routes.toml',
+              'src/sarex_loader/browser_extension.js',
+              'tests/__init__.py', 'tests/test_windows_native.py', 'tests/windows_journal_probe.py'
+            ]);
+            const commit = await github.rest.repos.getCommit({...context.repo, ref: context.sha});
+            const tree = await github.rest.git.getTree({
+              ...context.repo, tree_sha: commit.data.commit.tree.sha, recursive: '1'
+            });
+            if (tree.data.truncated) throw new Error('Repository tree truncated');
+            const selected = tree.data.tree.filter(f => fixed.has(f.path) ||
+              /^src\/sarex_loader\/[A-Za-z0-9_-]+\.py$/.test(f.path));
+            for (const name of fixed) {
+              if (!selected.some(f => f.path === name)) throw new Error('Missing CI file: ' + name);
+            }
+            for (let offset = 0; offset < selected.length; offset += 8) {
+              await Promise.all(selected.slice(offset, offset + 8).map(async f => {
+                if (f.type !== 'blob' || !['100644', '100755'].includes(f.mode) ||
+                    f.size > 1048576 || f.path.split('/').includes('..')) {
+                  throw new Error('Invalid CI source entry');
+                }
+                const blob = await github.rest.git.getBlob({...context.repo, file_sha: f.sha});
+                if (blob.data.encoding !== 'base64') throw new Error('Unexpected blob encoding');
+                const target = path.join(process.env.GITHUB_WORKSPACE, f.path);
+                fs.mkdirSync(path.dirname(target), {recursive: true});
+                fs.writeFileSync(target, Buffer.from(blob.data.content, 'base64'), {flag: 'wx'});
+              }));
+            }
+            if (fs.existsSync('account.toml')) throw new Error('Account must not be downloaded');
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Install package and test dependency
+        run: python -m pip install . pytest
+      - name: Create result directory
+        run: python -c "from pathlib import Path; Path('validation-results').mkdir()"
+      - name: CLI without authentication
+        run: python -m sarex_loader -help
+      - name: Identical synthetic inputs
+        run: python tools/platform_probe.py --output validation-results/platform.json
+      - name: SQLite lock, concurrent reader, crash recovery and replay
+        shell: bash
+        run: python tests/windows_journal_probe.py > validation-results/journal.json
+      - name: Native Windows guards (no skips allowed on Windows)
+        if: runner.os == 'Windows'
+        run: python -m pytest -q tests/test_windows_native.py --junitxml=validation-results/windows.xml
+      - name: Save synthetic diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: validation-${{ matrix.os }}
+          path: validation-results/
+          if-no-files-found: warn
+          retention-days: 14
+  compare:
+    needs: validate
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: validation-*
+          path: results
+      - name: Compare results, ignoring OS and filesystem path differences
+        shell: python
+        run: |
+          import json
+          from pathlib import Path
+          root = Path('results')
+          win = json.loads((root / 'validation-windows-latest/platform.json').read_text())
+          mac = json.loads((root / 'validation-macos-latest/platform.json').read_text())
+          if win['platform'] != 'Windows' or mac['platform'] != 'Darwin':
+              raise SystemExit('Unexpected operating systems')
+          if win['canonical'] != mac['canonical']:
+              raise SystemExit('Windows/macOS behavior differs; inspect artifacts')
+          for os_name in ('windows-latest', 'macos-latest'):
+              data = json.loads((root / f'validation-{os_name}/journal.json').read_text(encoding='utf-8-sig'))
+              if data['sarex_requests'] != 0 or data['checks']['replay_effects'] != 0:
+                  raise SystemExit('SQLite safety check failed')
+          import xml.etree.ElementTree as ET
+          report = ET.parse(root / 'validation-windows-latest/windows.xml')
+          if report.findall('.//skipped'):
+              raise SystemExit('Windows tests must not be skipped')
+          print('Windows/macOS synthetic behavior matches. Real upload is NOT certified.')
