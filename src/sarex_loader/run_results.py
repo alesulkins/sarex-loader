@@ -47,7 +47,8 @@ def pack_technical(technical, target):
     with ZipFile(target) as archive:
         if archive.testzip() is not None:
             raise ValidationError('Не удалось проверить технический архив; исходники сохранены.')
-    with target.open('rb') as stream:
+    # Windows _commit/fsync requires a writable descriptor; do not truncate the ZIP.
+    with target.open('r+b') as stream:
         os.fsync(stream.fileno())
     if os.name != 'nt':
         from sarex_loader.file_safety import directory_fd

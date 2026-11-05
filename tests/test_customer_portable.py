@@ -2,6 +2,8 @@
 import json
 from contextlib import contextmanager
 
+import pytest
+
 from sarex_loader import customer_test as flow
 from sarex_loader import customer_test_scope as scope
 from sarex_loader.api_transport import BearerToken
@@ -47,3 +49,35 @@ def test_customer_prepare_send_get_excel_and_repeat(tmp_path, monkeypatch, https
     repeated = flow.run(expected_plan=preview['plan_sha256'], ask=lambda _: 'да')
     assert repeated['already_confirmed'] == 1 and repeated['uploaded'] == 0
     assert sum(bytes(s.sent).startswith(b'POST ') for s in https_mock.sockets) == before
+
+
+def test_report_archive_preserves_content_and_removes_source_after_sync(tmp_path):
+    from zipfile import ZipFile
+
+    from sarex_loader.run_results import pack_technical
+
+    source = tmp_path / 'технические данные'
+    source.mkdir()
+    (source / 'данные.txt').write_text('проверка', encoding='utf-8')
+    target = tmp_path / 'отчёт.zip'
+    pack_technical(source, target)
+    assert not source.exists()
+    with ZipFile(target) as archive:
+        assert archive.read('данные.txt').decode('utf-8') == 'проверка'
+
+
+def test_report_archive_sync_failure_keeps_source(tmp_path, monkeypatch):
+    from sarex_loader import run_results
+
+    source = tmp_path / 'технические данные'
+    source.mkdir()
+    data = source / 'checkpoint.json'
+    data.write_text('{}', encoding='utf-8')
+
+    def fail_sync(fd):
+        raise OSError('synthetic sync failure')
+
+    monkeypatch.setattr(run_results.os, 'fsync', fail_sync)
+    with pytest.raises(OSError, match='synthetic sync failure'):
+        run_results.pack_technical(source, tmp_path / 'отчёт.zip')
+    assert data.read_text(encoding='utf-8') == '{}'
