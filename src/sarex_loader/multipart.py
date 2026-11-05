@@ -43,7 +43,13 @@ class MultipartPDF:
             if (not stat.S_ISREG(info.st_mode) or not 0 < info.st_size <= MAX_PDF_BYTES
                     or getattr(info, 'st_flags', 0) & CLOUD_PLACEHOLDER_FLAG):
                 raise ApiError(ApiErrorCode.INVALID_SOURCE)
-            self._identity = identity(info)
+            self._descriptor_identity = identity(info)
+            self._identity = self._descriptor_identity
+            if os.name == 'nt':
+                # Windows path stat exposes creation time in st_ctime, while fstat can
+                # expose metadata change time. Keep both comparisons with their own clock.
+                self._identity = (*self._descriptor_identity[:-1],
+                                  getattr(info, 'st_birthtime_ns', info.st_ctime_ns))
             self.filename = self.path.name
             boundary = 'sarex-' + secrets.token_hex(24)
             self.content_type = 'multipart/form-data; boundary=' + boundary
@@ -82,7 +88,7 @@ class MultipartPDF:
     def _check_identity(self) -> None:
         from sarex_loader.file_safety import child_stat
 
-        if (identity(os.fstat(self._stream.fileno())) != self._identity
+        if (identity(os.fstat(self._stream.fileno())) != self._descriptor_identity
                 or identity(child_stat(self._parent, self.path.name)) != self._identity):
             raise ApiError(ApiErrorCode.INVALID_SOURCE)
 

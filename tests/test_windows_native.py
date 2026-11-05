@@ -1,5 +1,7 @@
 """Execute on a real Windows host; skips here are not proof of Windows acceptance."""
+import hashlib
 import os
+import ssl
 from pathlib import Path
 
 import pytest
@@ -9,6 +11,7 @@ from sarex_loader.folder_creation import FolderSimulationJournal
 from sarex_loader.pdf_scan import scan_pdfs
 from sarex_loader.reports import _write_bundle
 from sarex_loader.safety import ValidationError
+from sarex_loader.synthetic_pdf import synthetic_pdf_bytes
 
 pytestmark = pytest.mark.skipif(os.name != 'nt', reason='Требуется настоящая Windows')
 
@@ -41,6 +44,47 @@ def test_native_metadata_does_not_open_pdf(tmp_path, monkeypatch):
     monkeypatch.setattr(Path, 'open', guarded)
     files = list(scan_pdfs(tmp_path, metadata_only=True))
     assert len(files) == 1 and files[0]['reason'] is None
+
+
+def test_native_pdf_scan_and_stream_after_timestamp_change(tmp_path):
+    from sarex_loader.multipart import MultipartPDF
+
+    path = tmp_path / '2026-01-02-тест-1.pdf'
+    content = synthetic_pdf_bytes()
+    path.write_bytes(content)
+    os.utime(path, (1700000000, 1700000000))
+    expected = hashlib.sha256(content).hexdigest()
+
+    metadata, = scan_pdfs(tmp_path, metadata_only=True)
+    scanned, = scan_pdfs(tmp_path)
+    assert scanned['reason'] is None and scanned['sha256'] == expected
+    assert scanned['identity'] == metadata['identity']
+    with MultipartPDF(tmp_path, path, expected_sha256=expected) as body:
+        with pytest.raises(PermissionError), path.open('r+b'):
+            pass
+        assert content in b''.join(body.iter_chunks())
+        assert body.complete
+
+
+def test_native_tls_trust_without_openssl_ca_files(tmp_path, monkeypatch):
+    from sarex_loader.api_client import _tls_context
+
+    untrusted = tmp_path / 'bad.pem'
+    untrusted.write_text('not a certificate', encoding='ascii')
+    monkeypatch.setenv('SSL_CERT_FILE', str(untrusted))
+    monkeypatch.setenv('SSL_CERT_DIR', str(tmp_path))
+    monkeypatch.setenv('SSLKEYLOGFILE', str(tmp_path / 'keylog'))
+    defaults = ssl.get_default_verify_paths()._replace(
+        openssl_cafile=str(tmp_path / 'missing.pem'),
+        openssl_capath=str(tmp_path / 'missing-dir'),
+    )
+    monkeypatch.setattr(ssl, 'get_default_verify_paths', lambda: defaults)
+
+    context = _tls_context()
+    assert context.cert_store_stats()['x509_ca'] > 0
+    assert context.verify_mode == ssl.CERT_REQUIRED and context.check_hostname
+    assert context.minimum_version == ssl.TLSVersion.TLSv1_2
+    assert context.keylog_filename is None
 
 
 def test_native_parent_handle_blocks_rename(tmp_path):

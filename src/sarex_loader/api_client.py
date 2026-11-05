@@ -130,15 +130,26 @@ def _remaining(deadline: float) -> float:
 
 
 def _tls_context() -> ssl.SSLContext:
-    # Use compiled OpenSSL CA locations, not SSL_CERT_FILE/SSL_CERT_DIR or SSLKEYLOGFILE.
+    # Use system trust and compiled OpenSSL paths, ignoring CA and keylog environment variables.
     context = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
     context.minimum_version = ssl.TLSVersion.TLSv1_2
+    if sys.platform == 'win32':
+        server_auth = ssl.Purpose.SERVER_AUTH.oid
+        certificates = b''.join(
+            certificate
+            for store in ('CA', 'ROOT')
+            for certificate, encoding, trust in ssl.enum_certificates(store)
+            if encoding == 'x509_asn' and (trust is True or server_auth in trust)
+        )
+        if certificates:
+            context.load_verify_locations(cadata=certificates)
     defaults = ssl.get_default_verify_paths()
     cafile = defaults.openssl_cafile if Path(defaults.openssl_cafile).is_file() else None
     capath = defaults.openssl_capath if Path(defaults.openssl_capath).is_dir() else None
-    if cafile is None and capath is None:
+    if cafile is not None or capath is not None:
+        context.load_verify_locations(cafile=cafile, capath=capath)
+    elif not context.cert_store_stats()['x509_ca']:
         raise ssl.SSLError('Trusted CA installation required.')
-    context.load_verify_locations(cafile=cafile, capath=capath)
     return context
 
 

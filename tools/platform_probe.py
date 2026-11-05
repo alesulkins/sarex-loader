@@ -4,12 +4,12 @@ import argparse
 import hashlib
 import json
 import platform
-import subprocess
 import sys
 import tempfile
 from datetime import datetime
 from pathlib import Path
 
+from check_release import check_load_blocked, execute_logged
 from openpyxl import Workbook, load_workbook
 from openpyxl.styles import Font
 
@@ -24,6 +24,7 @@ from sarex_loader.matching import InspectionIndex, build_match_report
 from sarex_loader.monthly_folders import filename_date_check, infer_month_name
 from sarex_loader.pdf_scan import identity, scan_pdfs
 from sarex_loader.safety import ValidationError
+from sarex_loader.user_settings import UserSettings, save_settings
 
 
 def require(value, message):
@@ -36,7 +37,7 @@ def no_network(event, args):
         raise RuntimeError("Network is prohibited during synthetic validation")
 
 
-def run():
+def run(output):
     sys.addaudithook(no_network)
     with tempfile.TemporaryDirectory(prefix="sarex-platform-") as tmp:
         root = Path(tmp).resolve()
@@ -128,16 +129,15 @@ def run():
             missing.exists() and hashlib.sha256(target.read_bytes()).hexdigest() == before,
             "Collision did not preserve both files",
         )
-        # No input means no account/paths/consent and therefore no network or mutations.
-        for args, code in [(["-help"], 0), (["-load", "sk"], 130), (["-load", "vk"], 130)]:
-            completed = subprocess.run(  # noqa: S603
-                [sys.executable, "-m", "sarex_loader", *args],
-                capture_output=True,
-                input=b'',
-                timeout=20,
-                check=False,
-            )
-            require(completed.returncode == code, "CLI exit code differs")
+        help_run = execute_logged(
+            output, 'platform-help', [sys.executable, '-I', '-m', 'sarex_loader', '-help'],
+            cwd=root, input=b'', timeout=20,
+        )
+        require(help_run.returncode == 0 and b'-load sk' in help_run.stdout, "CLI help failed")
+        account = root / 'account.toml'
+        check_load_blocked(output, sys.executable, root, account)
+        save_settings(UserSettings('synthetic-login', 'synthetic-password'), account)
+        check_load_blocked(output, sys.executable, root, account, configured=True)
         naming = infer_month_name(list(index.children[4].values()), "2026-02")
         conflict = filename_date_check("2025-01-02-тест-001.pdf", "2026-01-02")
         return {
@@ -168,7 +168,8 @@ if __name__ == "__main__":
     if args.output.exists():
         raise SystemExit("Output already exists")
     try:
-        result = run()
+        args.output.parent.mkdir(parents=True, exist_ok=True)
+        result = run(args.output)
     except Exception as exc:
         import traceback
 
