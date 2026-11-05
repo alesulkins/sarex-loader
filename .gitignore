@@ -59,3 +59,5 @@ __pycache__/
 !/tests/__init__.py
 !/tests/test_windows_native.py
 !/tests/windows_journal_probe.py
+
+!/tools/check_release.py

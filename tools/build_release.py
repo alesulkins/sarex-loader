@@ -33,12 +33,17 @@ ROOT_FILES = (
 )
 
 
-def build(root, output, version, *, include_account=False):
+def build(root, output, version, *, include_account=False, platform="all"):
     if not re.fullmatch(r"v[0-9]+\.[0-9]+\.[0-9]+(?:-rc\.[0-9]+)?", version):
         raise ValueError("Некорректная версия релиза.")
     if output.exists() or output.is_symlink():
         raise ValueError("Архив уже существует; перезапись запрещена.")
-    paths = [root / p for p in ROOT_FILES]
+    if platform not in {'all', 'macos', 'windows'}:
+        raise ValueError('Неизвестная платформа архива.')
+    selected = [p for p in ROOT_FILES if not (
+        platform == 'macos' and p.endswith('.bat')
+        or platform == 'windows' and p == 'start.command')]
+    paths = [root / p for p in selected]
     source = root / "src/sarex_loader"
     paths += sorted(source.glob("*.py"))
     paths += [source / "profile-routes.toml", source / "browser_extension.js"]
@@ -54,7 +59,7 @@ def build(root, output, version, *, include_account=False):
         if data.get("allow_folder_creation") is not False:
             raise ValueError("Создание папок должно оставаться выключенным.")
     output.parent.mkdir(parents=True, exist_ok=True)
-    prefix = "sarex-loader-" + version
+    prefix = "sarex-loader-" + version + ("-" + platform if platform != "all" else "")
     with ZipFile(output, "x", compression=ZIP_DEFLATED) as archive:
         for p in paths:
             archive.write(p, prefix + "/" + p.relative_to(root).as_posix())
@@ -64,6 +69,7 @@ def build(root, output, version, *, include_account=False):
         "file": str(output),
         "sha256": checksum,
         "files": len(paths) + 1,
+        "platform": platform,
         "account_included_from_workspace": include_account,
         "client_documents_included": False,
         "historical_journals_included": False,
@@ -72,8 +78,9 @@ def build(root, output, version, *, include_account=False):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Создать клиентский ZIP без рабочих данных.")
-    parser.add_argument("--version", default="v0.1.0-rc.1")
+    parser.add_argument("--version", default="v0.1.0-rc.2")
     parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--platform", choices=("all", "macos", "windows"), default="all")
     parser.add_argument(
         "--include-account",
         action="store_true",
@@ -85,7 +92,7 @@ if __name__ == "__main__":
             Path(__file__).resolve().parents[1],
             args.output.absolute(),
             args.version,
-            include_account=args.include_account,
+            include_account=args.include_account, platform=args.platform,
         )
     except (ValueError, OSError):
         raise SystemExit(

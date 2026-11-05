@@ -13,11 +13,13 @@ MENU = '''Sarex Loader
 4 — Восстановить URL в Excel ВК (с резервной копией)
 5 — Изменить логин и пароль
 6 — Справка
+7 — Подготовить тестовый PDF для 99-Тест (без отправки)
 0 — Выход
-Загрузка PDF и создание папок пока выключены.
+Производственная загрузка PDF и создание папок выключены.
 '''
 COMMANDS = {'1': ['-preview', 'sk'], '2': ['-preview', 'vk'],
-            '3': ['-fill', 'sk'], '4': ['-fill', 'vk'], '5': ['-setup'], '6': ['-help']}
+            '3': ['-fill', 'sk'], '4': ['-fill', 'vk'], '5': ['-setup'], '6': ['-help'],
+            '7': ['-test-pdf']}
 
 
 def main(argv=None, *, ask=input):
@@ -32,7 +34,7 @@ def main(argv=None, *, ask=input):
                 if choice in COMMANDS:
                     argv = COMMANDS[choice]
                     break
-                print('Введите число от 0 до 6.')
+                print('Введите число от 0 до 7.')
         if argv in (['-preview'], ['-fill']):
             while True:
                 profile = ask('Реестр: 1 — СК, 2 — ВК: ').strip().casefold()
@@ -40,7 +42,8 @@ def main(argv=None, *, ask=input):
                     argv = [*argv, 'sk' if profile in {'1', 'sk', 'ск'} else 'vk']
                     break
                 print('Выберите СК или ВК.')
-        if (len(argv) >= 2 and argv[0] in {'-preview', '-fill'} and argv[1] in {'sk', 'vk'}
+        if ((argv[:1] == ['-test-pdf'] or len(argv) >= 2
+             and argv[0] in {'-preview', '-fill'} and argv[1] in {'sk', 'vk'})
                 and not settings_configured(settings_path())):
             print('Первый запуск: укажите учётную запись Sarex. Настройки сохранятся локально.')
             result = customer_launcher.main(['-setup'])

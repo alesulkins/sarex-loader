@@ -642,7 +642,7 @@ def _authenticated_batch(config, options, report, operations, journal, recover, 
 
 
 def _execute_batch(config, options, report, operations, journal, recover, document_only,
-                   token_provider, *, acceptance=False):
+                   token_provider, *, acceptance=False, customer_test=False):
     """Shared sequential loader; transport owns every mutation authorization."""
     from sarex_loader.read_only_policy import DOCUMENTATION_BASE
     from sarex_loader.single_test_scope import TEST_DISK_ID, TEST_ROOT_ID
@@ -672,7 +672,7 @@ def _execute_batch(config, options, report, operations, journal, recover, docume
             verify()
             transport = SingleTestHTTPSTransport.for_batch(
                 journal, key, confirmed=True, url_only=recover, document_only=document_only,
-                    acceptance=acceptance)
+                    acceptance=acceptance, customer_test=customer_test)
             client = SarexClient(ApiSettings(DOCUMENTATION_BASE, ('https://api.sarex.io',)),
                                  transport=transport,
                                  token_provider=token_provider,

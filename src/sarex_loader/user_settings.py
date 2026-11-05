@@ -25,6 +25,7 @@ class UserSettings:
     username: str
     password: str
     allow_folder_creation: bool = False
+    results_dir: str | None = None
 
 
 def settings_path():
@@ -89,7 +90,8 @@ def load_settings(path=None):
                     raise ValidationError('Настройки доступны другим пользователям. '
                                           'Запустите -setup.')
         data = tomllib.loads(read_snapshot(path, 65536).decode('utf-8'))
-        if (set(data) != {'version', 'allow_folder_creation', 'auth', 'profiles'}
+        if (set(data) - {'version', 'allow_folder_creation', 'auth', 'profiles', 'results_dir'}
+                or not {'version', 'allow_folder_creation', 'auth', 'profiles'} <= set(data)
                 or data['version'] != 1 or type(data['allow_folder_creation']) is not bool
                 or set(data['auth']) != {'login', 'password'}
                 or set(data['profiles']) != set(PROFILE_ROOTS)):
@@ -101,7 +103,13 @@ def load_settings(path=None):
         username, password = data['auth']['login'], data['auth']['password']
         if any(type(v) is not str or not 1 <= len(v) <= 4096 for v in (username, password)):
             raise ValueError
-        return UserSettings(username, password, data['allow_folder_creation'])
+        results = data.get('results_dir')
+        if results is not None:
+            if type(results) is not str or not results.strip():
+                raise ValueError
+            if not local_path(results).is_absolute():
+                raise ValueError
+        return UserSettings(username, password, data['allow_folder_creation'], results)
     except (ValueError, KeyError, TypeError, UnicodeError):
         raise ValidationError('Некорректный файл настроек. '
                               'Выполните sarex-loader -setup.') from None
@@ -145,6 +153,7 @@ def save_settings(settings, path=None):
     raw = ('# Учётная запись Sarex. Пароль не выводить в логи и отчёты.\n'
            'version = 1\nallow_folder_creation = '
            + str(settings.allow_folder_creation).lower()
+           + ('\nresults_dir = ' + quote(settings.results_dir) if settings.results_dir else '')
            + '\n\n[auth]\nlogin = ' + quote(settings.username)
            + '\npassword = ' + quote(settings.password) + '\n')
     for kind, (root, _) in PROFILE_ROOTS.items():
@@ -189,7 +198,8 @@ def setup(*, ask=input, password_reader=getpass.getpass, path=None):
         if any(not v or len(v) > 4096 for v in (username, password)):
             raise ValidationError('Логин и пароль должны быть непустыми.')
         print('Создание папок отключено в текущей поставке: allow_folder_creation = false.')
-        result = save_settings(UserSettings(username, password), path)
+        previous_results = load_settings(path).results_dir if settings_configured(path) else None
+        result = save_settings(UserSettings(username, password, results_dir=previous_results), path)
         print('Настройки сохранены локально. Повторный -setup позволяет изменить учётную запись.')
         print('Файл настроек: ' + str(result))
     except getpass.GetPassWarning:

@@ -145,10 +145,11 @@ class SingleTestHTTPSTransport(ReadOnlyHTTPSTransport):
 
     @classmethod
     def for_batch(cls, journal, key, *, confirmed=False, url_only=False, document_only=False,
-                  acceptance=False):
+                  acceptance=False, customer_test=False):
         """Reuse the exact adapter, TLS, ordering and candidate capture for one batch item."""
         parent, path_ids, ledger = TEST_PARENT_ID, TEST_PATH_IDS, batch_journal_path()
-        if type(acceptance) is not bool:
+        if (type(acceptance) is not bool or type(customer_test) is not bool
+                or acceptance and customer_test):
             raise ValidationError('Неверный тестовый режим.')
         if acceptance:
             from sarex_loader.acceptance_scope import journal_path, manifest, validate_item
@@ -166,6 +167,18 @@ class SingleTestHTTPSTransport(ReadOnlyHTTPSTransport):
                 names.add(operation['filename'])
             if names != {f['filename'] for f in manifest()['files']}:
                 raise ValidationError('Нужны две разные разрешённые тестовые операции.')
+            parent, path_ids = validate_item(journal.operation(key))
+        if customer_test:
+            from sarex_loader.customer_test_scope import (
+                journal_path,
+                validate_item,
+                validate_journal,
+            )
+
+            if type(journal) is not Journal:
+                raise ValidationError('Нужен SQLite-журнал теста.')
+            validate_journal(journal)
+            ledger = journal_path()
             parent, path_ids = validate_item(journal.operation(key))
         if (cls is not SingleTestHTTPSTransport or type(journal) is not Journal
                 or journal.path != ledger or type(url_only) is not bool
@@ -200,6 +213,7 @@ class SingleTestHTTPSTransport(ReadOnlyHTTPSTransport):
             self, ReadOnlyPolicy((parent, TEST_ROOT_ID)), confirmed=confirmed)
         self._batch, self._batch_url_only = True, document_only
         self._acceptance = acceptance
+        self._customer_test = customer_test
         self._parent_id, self._path_ids = parent, path_ids
         self._batch_document_policy = batch_document_policy(item) and state != 'OUTCOME_UNKNOWN'
         self._config = BundleDraft(TEST_DISK_ID, item['document_type'], item['file_key'],
@@ -251,6 +265,10 @@ class SingleTestHTTPSTransport(ReadOnlyHTTPSTransport):
         if type(method) is not str or type(url) is not str \
                 or (method, url) != (expected_method, DOCUMENTATION_BASE + route):
             raise ApiError(ApiErrorCode.ACCESS_DENIED)
+        if method == 'POST' and getattr(self, '_customer_test', False):
+            from sarex_loader.customer_test_scope import validate_journal
+
+            validate_journal(self._journal)
         if method == 'POST' and self._acceptance:
             from sarex_loader.acceptance_scope import journal_path, validate_item
 

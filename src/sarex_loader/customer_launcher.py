@@ -18,6 +18,8 @@ sarex-loader -load vk        Загрузка ВК: временно забло�
 sarex-loader -load test DIR  Просмотр фиксированного теста двух PDF в 99-Тест.
 sarex-loader -fill sk        Записать URL СК в переданный Excel с резервной копией.
 sarex-loader -fill vk        Записать URL ВК в переданный Excel с резервной копией.
+sarex-loader -test-pdf       Подготовить один тестовый PDF и проверить 99-Тест (GET).
+sarex-loader -test-pdf --send SHA256  Отдельно подтвердить тестовую отправку.
 sarex-loader -help           Эта справка.
 
 Пути вводятся при запуске. -fill меняет только пустые URL в переданном Excel.
@@ -52,8 +54,7 @@ def collect_inputs(command, profile, *, ask=input):
             break
         except ValidationError as exc:
             print(str(exc))
-    results = ask_path('Отдельная существующая папка результатов: ', directory=True, ask=ask)
-    return {'excel': excel, 'pdf': pdf, 'root_url': root_url, 'results': results}
+    return {'excel': excel, 'pdf': pdf, 'root_url': root_url}
 
 
 def main(argv=None):
@@ -62,6 +63,10 @@ def main(argv=None):
         print(HELP)
         return 0
     try:
+        if argv[:1] == ['-test-pdf']:
+            from sarex_loader.customer_test import command as test_command
+
+            return test_command(argv[1:])
         if argv[:2] == ['-load', 'test']:
             from sarex_loader.acceptance_upload import command
 
@@ -88,7 +93,8 @@ def main(argv=None):
                                   'Никакие запросы не отправлены. Используйте -preview ' + profile)
         settings = require_settings()
         inputs = collect_inputs(command, profile)
-        run_profile(command, profile, settings=settings, **inputs, **options)
+        run_profile(command, profile, results=settings.results_dir,
+                    settings=settings, **inputs, **options)
         return 0
     except (EOFError, KeyboardInterrupt):
         print('Работа прервана. Сохранённые журналы и файлы не удаляйте.')

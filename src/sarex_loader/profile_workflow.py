@@ -33,7 +33,7 @@ def profile_config(profile, excel, root_url):
     return parse_recovery_config(data)
 
 
-def run_profile(command, profile, excel, root_url, results, settings, *, pdf=None,
+def _run_profile(command, profile, excel, root_url, results, settings, *, pdf=None,
                 no_move=False, resume=None):
     if command not in ('preview', 'fill'):
         raise ValidationError('Реальная загрузка временно заблокирована; используйте -preview.')
@@ -117,3 +117,11 @@ def run_profile(command, profile, excel, root_url, results, settings, *, pdf=Non
     print('Создание папок отключено. Результат: ' + str(output))
     report['output_directory'] = str(output)
     return report
+
+
+def run_profile(command, profile, excel, root_url, results, settings, *, pdf=None,
+                no_move=False, resume=None):
+    from sarex_loader.run_results import execute_with_reports
+
+    return execute_with_reports(_run_profile, command, profile, excel, root_url,
+                                results, settings, pdf=pdf, no_move=no_move, resume=resume)
