@@ -42,10 +42,16 @@ class FileInfo:
     attributes: int
 
 
-def validate_acl(owner, aces, current_user):
+def validate_acl(owner, aces, current_user, *, token_owner=None):
     """Only this user, SYSTEM and local administrators may be granted any access."""
     allowed = {current_user, 'S-1-5-18', 'S-1-5-32-544'}
-    if owner != current_user or not aces:
+    # SQLite creates its own sidecar files. Under an elevated Windows token their
+    # owner can be TokenOwner (Administrators), not TokenUser. Do not allow an
+    # arbitrary group: only the actual token owner, already in our trusted ACL set.
+    owners = {current_user}
+    if token_owner in allowed:
+        owners.add(token_owner)
+    if owner not in owners or not aces:
         raise ValidationError('Журнал должен принадлежать текущему пользователю '
                               'и иметь закрытый ACL.')
     for kind, sid in aces:
@@ -83,6 +89,7 @@ class WindowsJournalAPI:
             function = getattr(library, name)
             function.argtypes, function.restype = args, result
         self.user = self._current_user()
+        self.owner = self._token_sid(4)  # TokenOwner, used by SQLite-created files.
 
     def _sid(self, pointer):
         text = PTR()
@@ -94,16 +101,20 @@ class WindowsJournalAPI:
             self.kernel.LocalFree(text)
 
     def _current_user(self):
+        return self._token_sid(1)  # TokenUser
+
+    def _token_sid(self, information_class):
         token = PTR()
         if not self.security.OpenProcessToken(self.kernel.GetCurrentProcess(), 8, c.byref(token)):
             raise c.WinError(c.get_last_error())
         try:
             size = DWORD()
-            self.security.GetTokenInformation(token, 1, None, 0, c.byref(size))
+            self.security.GetTokenInformation(token, information_class, None, 0, c.byref(size))
             if not 0 < size.value <= 65536:
                 raise ValidationError('Не удалось проверить владельца журнала Windows.')
             buffer = c.create_string_buffer(size.value)
-            if not self.security.GetTokenInformation(token, 1, buffer, size, c.byref(size)):
+            if not self.security.GetTokenInformation(
+                    token, information_class, buffer, size, c.byref(size)):
                 raise c.WinError(c.get_last_error())
             return self._sid(c.cast(buffer, c.POINTER(PTR))[0])
         finally:
@@ -138,6 +149,8 @@ class WindowsJournalAPI:
         # Share read/write with SQLite, but NEVER share deletion/rename of held objects.
         access = (0xC0000000 if write else
                   0x80000000 if data else 0x20080)  # READ_CONTROL | FILE_READ_ATTRIBUTES
+        if directory:
+            access |= 1  # FILE_LIST_DIRECTORY: enforce the no-delete sharing contract.
         flags = 0x00200000 | (0x02000000 if directory else 0x80)
         with self._attributes() as attributes:
             handle = self.kernel.CreateFileW(str(path), access, 0 if exclusive else 3,
@@ -190,7 +203,7 @@ class WindowsJournalAPI:
                 if kind not in (0, 1) or size < 16:
                     raise ValidationError('Неизвестное правило ACL журнала.')
                 aces.append((kind, self._sid(ace.value + 8)))
-            validate_acl(self._sid(owner), aces, self.user)
+            validate_acl(self._sid(owner), aces, self.user, token_owner=self.owner)
         finally:
             self.kernel.LocalFree(descriptor)
 

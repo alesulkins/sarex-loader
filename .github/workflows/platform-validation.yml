@@ -35,7 +35,8 @@ jobs:
               'tools/platform_probe.py', 'src/sarex_loader/profile-routes.toml',
               'src/sarex_loader/browser_extension.js',
               'tests/__init__.py', 'tests/test_windows_native.py', 'tests/windows_journal_probe.py',
-              'tests/test_console_encoding.py', 'tests/test_windows_metadata_identity.py'
+              'tests/test_console_encoding.py', 'tests/test_windows_metadata_identity.py',
+              'tests/test_windows_security_regressions.py'
             ]);
             const commit = await github.rest.repos.getCommit({...context.repo, ref: context.sha});
             const tree = await github.rest.git.getTree({
@@ -75,7 +76,7 @@ jobs:
           python -m sarex_loader -help 2>&1 | tee validation-results/cli-help.txt
       - name: Console regression including forced cp1252
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
-        run: python -m pytest -q tests/test_console_encoding.py tests/test_windows_metadata_identity.py --junitxml=validation-results/console.xml
+        run: python -m pytest -q tests/test_console_encoding.py tests/test_windows_metadata_identity.py tests/test_windows_security_regressions.py --junitxml=validation-results/console.xml
       - name: Identical synthetic inputs
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         run: python tools/platform_probe.py --output validation-results/platform.json

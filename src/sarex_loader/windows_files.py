@@ -46,8 +46,9 @@ def _handle(path, *, directory=False, create=False):
     import msvcrt
 
     api = _kernel()
-    # READ_ATTRIBUTES for directory; files get read or write access. No FILE_SHARE_DELETE.
-    access = 0x80 if directory else (0x40000000 if create else 0x80000000)
+    # FILE_LIST_DIRECTORY participates in share checks; READ_ATTRIBUTES alone does not.
+    # Without this data-access bit a held directory can still be renamed on Windows.
+    access = 0x81 if directory else (0x40000000 if create else 0x80000000)
     share = 3 if directory else 1
     flags = 0x00200000 | (0x02000000 if directory else 0)
     handle = api.CreateFileW(str(path), access, share, None, 1 if create else 3, flags, None)

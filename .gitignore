@@ -66,3 +66,5 @@ __pycache__/
 
 !/tests/test_windows_metadata_identity.py
 !/ACCEPTANCE.md
+
+!/tests/test_windows_security_regressions.py

@@ -16,6 +16,8 @@ sarex-loader -preview sk     Проверить Excel и PDF СК, прочит�
 sarex-loader -preview vk     Проверить Excel и PDF ВК, прочитать всё дерево ВК.
 sarex-loader -load sk        Загрузка СК: временно заблокирована.
 sarex-loader -load vk        Загрузка ВК: временно заблокирована.
+sarex-loader -load sk --dry-run  Проверка загрузки СК без отправки и перемещений.
+sarex-loader -load vk --dry-run  Проверка загрузки ВК без отправки и перемещений.
 sarex-loader -load test DIR  Просмотр фиксированного теста двух PDF в 99-Тест.
 sarex-loader -fill sk        Записать URL СК в переданный Excel с резервной копией.
 sarex-loader -fill vk        Записать URL ВК в переданный Excel с резервной копией.
@@ -77,6 +79,9 @@ def main(argv=None):
             setup()
             return 0
         options = {}
+        dry_run = '--dry-run' in argv
+        if dry_run:
+            argv.remove('--dry-run')
         if '--no-move' in argv:
             argv.remove('--no-move')
             options['no_move'] = True
@@ -90,6 +95,11 @@ def main(argv=None):
                 or argv[1] not in ('sk', 'vk')):
             raise ValidationError('Неизвестная команда или профиль. Выполните sarex-loader -help.')
         command, profile = argv[0][1:], argv[1]
+        if dry_run:
+            if command != 'load':
+                raise ValidationError('Флаг --dry-run применяется к -load sk/vk. '
+                                      'Для просмотра используйте -preview sk/vk.')
+            command = 'preview'
         if command == 'load':
             raise ValidationError('Реальная загрузка временно заблокирована. '
                                   'Никакие запросы не отправлены. Используйте -preview ' + profile)

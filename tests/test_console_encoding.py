@@ -44,3 +44,29 @@ def test_bootstrap_error_is_readable_in_cp1252(tmp_path):
     assert result.returncode == 2
     assert 'Нужен Python' in result.stdout.decode('utf-8')
     assert b'Traceback' not in result.stderr
+
+
+def test_load_dry_run_uses_only_preview(monkeypatch, tmp_path):
+    from types import SimpleNamespace
+
+    from sarex_loader import customer_launcher as launcher
+
+    calls = []
+    monkeypatch.setattr(launcher, 'require_settings', lambda: SimpleNamespace(results_dir=None))
+    monkeypatch.setattr(launcher, 'collect_inputs',
+                        lambda command, profile: calls.append(('inputs', command, profile)) or {})
+    monkeypatch.setattr(launcher, 'run_profile',
+                        lambda command, profile, **kwargs: calls.append(('run', command, profile)))
+    for profile in ('sk', 'vk'):
+        assert launcher.main(['-load', profile, '--dry-run']) == 0
+        assert calls[-2:] == [('inputs', 'preview', profile), ('run', 'preview', profile)]
+
+
+def test_fill_dry_run_is_rejected_before_authorization(monkeypatch):
+    from sarex_loader import customer_launcher as launcher
+
+    def forbidden():
+        raise AssertionError('Invalid command must not authorize')
+
+    monkeypatch.setattr(launcher, 'require_settings', forbidden)
+    assert launcher.main(['-fill', 'sk', '--dry-run']) == 2

@@ -5,13 +5,13 @@
 Собрать клиентский архив на Mac из корня проекта:
 
 ```sh
-.venv/bin/python tools/build_release.py --platform macos --output dist/sarex-loader-v0.1.0-rc.4-macos.zip
-.venv/bin/python tools/build_release.py --platform windows --output dist/sarex-loader-v0.1.0-rc.4-windows.zip
+.venv/bin/python tools/build_release.py --platform macos --output dist/sarex-loader-v0.1.0-rc.5-macos.zip
+.venv/bin/python tools/build_release.py --platform windows --output dist/sarex-loader-v0.1.0-rc.5-windows.zip
 ```
 
 Архив по умолчанию содержит пустую авторизацию. Если нужно передать именно текущую учётную запись в закрытой поставке, добавьте `--include-account` и используйте другое, ещё не существующее имя ZIP. Конфиг никогда не отправляется в Windows CI. Не размещайте такой архив публично.
 
-GitHub → Releases → Draft a new release → Choose a tag → создайте `v0.1.0-rc.4` от проверенного коммита main. Заголовок: `Sarex Loader v0.1.0-rc.4 — предварительная проверка`. Прикрепите оба ZIP и файл SHA256SUMS.txt, отметьте **Set as a pre-release**. Проверьте приватность репозитория перед Publish release. Это не финальная рабочая версия.
+GitHub → Releases → Draft a new release → Choose a tag → создайте `v0.1.0-rc.5` от проверенного коммита main. Заголовок: `Sarex Loader v0.1.0-rc.5 — предварительная проверка`. Прикрепите оба ZIP и файл SHA256SUMS.txt, отметьте **Set as a pre-release**. Проверьте приватность репозитория перед Publish release. Это не финальная рабочая версия.
 
 Текст для описания релиза:
 
@@ -43,3 +43,11 @@ GitHub → Releases → Draft a new release → Choose a tag → создайт�
 - Независимые проверки CI выполняются даже после отказа соседнего шага; при сбое сопоставления сохраняются фактические статусы и причины.
 - Добавлена инструкция приёмки ACCEPTANCE.md. Пользователь сообщил об успешной отправке нового синтетического теста в 99-Тест; новых серверных операций в этом исправлении нет.
 - Нативный Windows-прогон исправленной версии ещё требуется. Производственная загрузка и создание папок не включены.
+
+## Исправления Windows CI — rc.5
+
+- SQLite: владелец служебного файла может совпадать с реальным `TokenOwner` процесса, в том числе Administrators у повышенного runner. Это не отменяет закрытый ACL: доступ разрешён только пользователю, SYSTEM и Administrators. Чужой владелец и лишние разрешения по-прежнему блокируются. Существующие ACL и журналы не переписываются. Основание: [Microsoft: владелец нового объекта](https://learn.microsoft.com/en-us/windows/win32/secauthz/owner-of-a-new-object).
+- Удержание папок Windows теперь запрашивает `FILE_LIST_DIRECTORY` вместе с атрибутами и не разрешает `FILE_SHARE_DELETE`. Одних запросов атрибутов недостаточно для требуемого участия в проверке совместного доступа: [Microsoft CreateFile](https://learn.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-createfilea).
+- BAT сначала использует установленный Python из `.venv`, затем Python из PATH, затем `py`. Пауза — только при запуске без аргументов. CI проверяет первый запуск BAT из нового архива и повторный запуск; stdout/stderr и код завершения сохраняются отдельно. Предыдущий лог не содержал вывода BAT, поэтому подтверждение исправления требует нативного прогона.
+- `-load sk --dry-run` и `-load vk --dry-run` выполняют тот же безопасный просмотр, что `-preview`: GET и отчёты, без отправки, перемещения PDF и изменений Excel.
+- Рабочие `-load sk/vk` без `--dry-run` и тестовая отправка на Windows ещё заблокированы. Этот выпуск исправляет обнаруженные ошибки CI, но не является завершённым переносом всей цепочки upload на Windows.
