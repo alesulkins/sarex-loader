@@ -4,6 +4,8 @@
 
 **Команды:** доступны preview, fill, отдельный синтетический тест в `99-Тест` и рабочая загрузка СК/ВК после явного подтверждения плана. Создание папок отключено. Приёмка конкретного выпуска и результаты Windows CI описываются в RELEASE_NOTES; успешные mocks не означают приёмку реальной партии.
 
+Разработчику, который продолжает работу над Windows, стоит начать с раздела [«Передача работы по Windows»](#передача-работы-по-windows).
+
 ## 1. Windows: установка и открытие программы
 
 1. Установите Python **3.11 или новее** с [python.org](https://www.python.org/downloads/windows/). При установке включите **Add Python to PATH**. Затем заново откройте терминал.
@@ -216,8 +218,50 @@ macOS:
 
 ## Windows CI, приёмка и поставка
 
-Для разработчика: GitHub → Actions → **Windows and macOS validation** → **Run workflow** → `main`. Дождитесь обеих задач `validate` и задачи `compare`. При ошибке скачайте артефакты `validation-windows-latest` / `validation-macos-latest`: там результаты тестов и stdout/stderr запуска BAT. Нужен новый запуск на актуальном коммите, а не повтор старого задания.
+Откройте **Windows and macOS validation** в GitHub Actions и выберите ветку с проверяемым коммитом. Для текущих исправлений это `fix/windows-native`. Дождитесь обеих задач `validate` и задачи `compare`. Артефакты `validation-windows-latest` и `validation-macos-latest` содержат результаты тестов и логи запуска. После изменения кода запустите workflow для нового коммита.
 
 CI использует только разрешённые исходники и синтетические файлы, без учётной записи Sarex, клиентских документов и исторических SQLite. Проверяет установку ZIP, CLI, Excel, файловые операции, SQLite, восстановление и равенство результатов платформ. CI также проверяет обе рабочие цепочки СК/ВК и 99-Тест через fake HTTPS: отправку, GET, SQLite, запись Excel и повтор без POST. Это не реальная отправка в Sarex.
 
 Порядок приёмки: [ACCEPTANCE.md](ACCEPTANCE.md). Подготовка релиза: [RELEASE_NOTES.md](RELEASE_NOTES.md) в репозитории. Окончательная приёмка включает проверку установки на компьютере заказчика, маршрутов и ссылок, повтор 99-Тест и отдельно разрешённую небольшую рабочую партию.
+
+## Передача работы по Windows
+
+Состояние на 5 ноября 2026 года. Ветка `fix/windows-native`, проверенный коммит `02dc3bc`, автор `vladlenblch`. База `cc31192` совпала с `origin/main`. [Коммит с исправлениями](https://github.com/alesulkins/sarex-loader/commit/02dc3bc765311d551010d4d7b2e6cbcf30e11aa0)
+
+- `src/sarex_loader/multipart.py` учитывает разные значения `st_ctime` у пути и открытого дескриптора на Windows. Проверки идентификатора, размера, времени изменения и SHA‑256 сохранены.
+- `src/sarex_loader/api_client.py` использует системные CA Windows с проверкой имени сервера и минимумом TLS 1.2.
+- `tools/platform_probe.py` и `tools/check_release.py` проверяют код `2` без настроек и `130` при закрытом stdin с синтетическими настройками. Проверка Windows ZIP включает первый и повторный запуск BAT.
+
+| Где запускали | Результат |
+|---|---|
+| Windows Server 2025 x64, GitHub Actions | 8 нативных тестов без пропусков, 22 платформенные проверки и 13 сценариев загрузки через fake HTTPS прошли. Чистая установка ZIP, повтор BAT, SQLite, восстановление `OUTCOME_UNKNOWN` и офлайн-демо прошли. |
+| macOS 26.3.1, Apple M4, локально | 2453 теста и 103 подтеста прошли, 8 Windows-тестов пропущены. Ruff и чистая установка ZIP прошли. Шаг `compare` выполнен локально с результатами этой macOS и артефактом Windows runner. |
+| macOS ARM64, GitHub Actions | Две попытки отменены из-за нехватки раннеров. Третья на момент проверки ждала раннер. |
+| Windows 11 Arm64, UTM | VM создана и выключена. Обычный установщик дошёл до экрана ключа. SHA‑256 ознакомительного ISO разошёлся с опубликованным Microsoft. Локальный запуск Windows-тестов остаётся открытым. |
+
+Статус последующих попыток смотрите в [GitHub Actions](https://github.com/alesulkins/sarex-loader/actions/runs/42071042260). В переданном рабочем каталоге папка `outputs` содержит `WINDOWS_CI_HANDOFF.md`, проверенные ZIP для обеих платформ и архив `sarex-windows-validation-2026-11-05.zip` с синтетическими отчётами.
+
+### Повторить проверки вне GitHub Actions
+
+На настоящей Windows и macOS создайте отдельные виртуальные окружения Python 3.13. Из каталога исходников выполните команды ниже через Python соответствующего окружения. Для каждого прогона используйте новый каталог результатов.
+
+```text
+python -m pip install . pytest
+python tools/platform_probe.py --output validation-results/platform.json
+python tools/check_release.py --output validation-results/release.json
+python tools/mock_demo.py validation-results/offline-demo
+```
+
+На Windows выполните в PowerShell:
+
+```powershell
+python tests/windows_journal_probe.py | Set-Content -Encoding utf8 validation-results/journal.json
+python -m pytest -q tests/test_windows_native.py --junitxml=validation-results/windows.xml
+python -m pytest -q tests/test_production_upload.py tests/test_customer_portable.py
+```
+
+На macOS сохраните результат SQLite командой `python tests/windows_journal_probe.py > validation-results/journal.json`. Сравните `platform.json` обеих платформ по полю `canonical`. Для полного шага `compare` из `.github/workflows/platform-validation.yml` положите отчёты в `results/validation-windows-latest` и `results/validation-macos-latest`.
+
+Для сценариев `-preview` и `-fill` через fake HTTPS используйте `tests/test_profile_commands.py` из переданного архива исходников. Этот локальный тест и часть вспомогательных файлов игнорируются Git. Список таких файлов и два синтетических TOML-шаблона лежат в архиве диагностики.
+
+Для этой проверки используйте только синтетические данные и mock API. Ожидаемый результат `mock_demo.py` — один синтетический документ, два пропущенных дубликата, ноль повторных POST и ноль реальных запросов к Sarex. Любые действия с `00-ТехЗак` и реальная приёмка требуют отдельного согласования.
