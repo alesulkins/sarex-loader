@@ -78,7 +78,7 @@ def build(root, output, version, *, include_account=False, platform="all"):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Создать клиентский ZIP без рабочих данных.")
-    parser.add_argument("--version", default="v0.1.0-rc.2")
+    parser.add_argument("--version", default="v0.1.0-rc.3")
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--platform", choices=("all", "macos", "windows"), default="all")
     parser.add_argument(

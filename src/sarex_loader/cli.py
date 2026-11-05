@@ -5,6 +5,7 @@ import sys
 from collections.abc import Sequence
 
 from sarex_loader.config import COMMANDS, INSPECTION_TYPES, load_config
+from sarex_loader.console import configure_console
 from sarex_loader.messages import describe, emit_report
 from sarex_loader.safe_logging import Event, make_logger
 from sarex_loader.safety import ValidationError
@@ -89,8 +90,9 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main(argv: Sequence[str] | None = None) -> int:
+    configure_console()
     supplied = list(sys.argv[1:] if argv is None else argv)
-    if supplied and supplied[0] in {'-setup', '-preview', '-load', '-fill', '-help'}:
+    if supplied and supplied[0] in {'-setup', '-preview', '-load', '-fill', '-help', '-test-pdf'}:
         from sarex_loader.customer_launcher import main as customer_main
 
         return customer_main(supplied)

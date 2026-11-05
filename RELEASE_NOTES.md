@@ -5,13 +5,13 @@
 Собрать клиентский архив на Mac из корня проекта:
 
 ```sh
-.venv/bin/python tools/build_release.py --platform macos --output dist/sarex-loader-v0.1.0-rc.2-macos.zip
-.venv/bin/python tools/build_release.py --platform windows --output dist/sarex-loader-v0.1.0-rc.2-windows.zip
+.venv/bin/python tools/build_release.py --platform macos --output dist/sarex-loader-v0.1.0-rc.3-macos.zip
+.venv/bin/python tools/build_release.py --platform windows --output dist/sarex-loader-v0.1.0-rc.3-windows.zip
 ```
 
 Архив по умолчанию содержит пустую авторизацию. Если нужно передать именно текущую учётную запись в закрытой поставке, добавьте `--include-account` и используйте другое, ещё не существующее имя ZIP. Конфиг никогда не отправляется в Windows CI. Не размещайте такой архив публично.
 
-GitHub → Releases → Draft a new release → Choose a tag → создайте `v0.1.0-rc.2` от проверенного коммита main. Заголовок: `Sarex Loader v0.1.0-rc.2 — предварительная проверка`. Прикрепите оба ZIP и файл SHA256SUMS.txt, отметьте **Set as a pre-release**. Проверьте приватность репозитория перед Publish release. Это не финальная рабочая версия.
+GitHub → Releases → Draft a new release → Choose a tag → создайте `v0.1.0-rc.3` от проверенного коммита main. Заголовок: `Sarex Loader v0.1.0-rc.3 — предварительная проверка`. Прикрепите оба ZIP и файл SHA256SUMS.txt, отметьте **Set as a pre-release**. Проверьте приватность репозитория перед Publish release. Это не финальная рабочая версия.
 
 Текст для описания релиза:
 
@@ -28,3 +28,11 @@ GitHub → Releases → Draft a new release → Choose a tag → создайт�
 - Авторизация в обоих архивах пустая. При первом запуске нужен логин и скрытый ввод пароля. Python 3.11+ и интернет для установки зависимостей обязательны. Это ZIP исходников с запускателем, не самостоятельный exe/app.
 
 После зелёного Windows CI можно взять проверенный Windows ZIP из артефакта `validation-windows-latest`; macOS ZIP — из `validation-macos-latest`. Это предпочтительнее публикации Windows-архива до нативной проверки.
+
+## Исправление Windows CI — rc.3
+
+- Русская справка и ошибки выводятся в UTF-8 даже при перенаправлении в cp1252; это было причиной падения Windows runner.
+- Проверяются все входные команды справки с cp1252, ASCII и UTF-8.
+- Исправлена маршрутизация `python -m sarex_loader -test-pdf`.
+- Actions обновлены для Node.js 24; журнал задания создаётся до установки, вывод CLI сохраняется при сбое.
+- Нужен новый Run workflow после push. Re-run старого запуска использует прежний коммит. До зелёного Windows runner новая версия остаётся предварительной; полная Windows-загрузка всё ещё выключена и требует отдельной доработки и приёмки.

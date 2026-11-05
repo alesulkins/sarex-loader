@@ -38,6 +38,10 @@ def prepare(root):
 
 
 def main(argv=None):
+    # Bootstrap runs before the package exists, including redirected Windows output.
+    for stream in (sys.stdout, sys.stderr):
+        if callable(getattr(stream, "reconfigure", None)):
+            stream.reconfigure(encoding="utf-8", errors="backslashreplace")
     # This standalone entry point also runs before package installation on older Python.
     if sys.version_info < (3, 11):  # noqa: UP036
         print('Нужен Python 3.11 или новее. Установите Python и запустите программу снова.')

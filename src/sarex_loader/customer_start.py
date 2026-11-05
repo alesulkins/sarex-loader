@@ -3,6 +3,7 @@
 import sys
 
 from sarex_loader import customer_launcher
+from sarex_loader.console import configure_console
 from sarex_loader.safety import ValidationError
 from sarex_loader.user_settings import settings_configured, settings_path
 
@@ -23,6 +24,7 @@ COMMANDS = {'1': ['-preview', 'sk'], '2': ['-preview', 'vk'],
 
 
 def main(argv=None, *, ask=input):
+    configure_console()
     argv = list(sys.argv[1:] if argv is None else argv)
     try:
         if not argv:

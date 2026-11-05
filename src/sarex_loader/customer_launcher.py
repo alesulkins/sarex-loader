@@ -3,6 +3,7 @@
 import sys
 
 from sarex_loader.config import checked_path, local_path
+from sarex_loader.console import configure_console
 from sarex_loader.messages import describe
 from sarex_loader.profile_workflow import run_profile
 from sarex_loader.safety import ValidationError
@@ -58,6 +59,7 @@ def collect_inputs(command, profile, *, ask=input):
 
 
 def main(argv=None):
+    configure_console()
     argv = list(sys.argv[1:] if argv is None else argv)
     if argv in ([], ['-help'], ['--help'], ['-h']):
         print(HELP)
