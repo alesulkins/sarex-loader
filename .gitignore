@@ -63,3 +63,6 @@ __pycache__/
 !/tools/check_release.py
 
 !/tests/test_console_encoding.py
+
+!/tests/test_windows_metadata_identity.py
+!/ACCEPTANCE.md

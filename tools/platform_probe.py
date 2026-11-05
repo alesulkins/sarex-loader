@@ -65,7 +65,11 @@ def run():
         entries = list(scan_pdfs(pdf, metadata_only=True))
         matched = build_match_report(InspectionIndex([registry], {"sk": rules}), entries, "sk", "-")
         statuses = sorted((f["number"], f["category"]) for f in matched["files"])
-        require(statuses == [("001", "MATCHED"), ("999", "NOT_FOUND")], "Matching differs")
+        require(
+            statuses == [("001", "MATCHED"), ("999", "NOT_FOUND")],
+            "Matching differs: "
+            + json.dumps({"statuses": statuses, "files": matched["files"]}, ensure_ascii=False),
+        )
         nodes = [
             {"id": i, "name": name, "path": ".".join(map(str, range(1, i + 1))), "is_folder": True}
             for i, name in enumerate(("Root", "Офис", "Компания", "Инспекции", "2026-01"), 1)
@@ -162,6 +166,24 @@ if __name__ == "__main__":
     args = parser.parse_args()
     if args.output.exists():
         raise SystemExit("Output already exists")
-    result = run()
+    try:
+        result = run()
+    except Exception as exc:
+        import traceback
+
+        args.output.with_suffix(".failure.json").write_text(
+            json.dumps(
+                {
+                    "platform": platform.system(),
+                    "error": str(exc),
+                    "traceback": traceback.format_exc(),
+                    "synthetic_inputs_only": True,
+                },
+                ensure_ascii=False,
+                indent=2,
+            ),
+            encoding="utf-8",
+        )
+        raise
     args.output.write_text(json.dumps(result, ensure_ascii=False, indent=2), encoding="utf-8")
     print("Synthetic platform checks passed: " + result["platform"])

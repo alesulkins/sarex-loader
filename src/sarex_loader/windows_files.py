@@ -117,7 +117,9 @@ def scan_metadata(root, max_entries, max_pdf_bytes):
                 result = {'filename': entry.name, 'sha256': None, 'size': None,
                           'identity': None, 'reason': None}
                 try:
-                    info = entry.stat(follow_symlinks=False)
+                    # DirEntry.stat on Windows reports st_ino/st_dev as zero.
+                    # Fresh lstat-equivalent metadata is required for hard-link detection.
+                    info = os.stat(entry.path, follow_symlinks=False)
                     if not safe_component(entry.name) or not entry.name.lower().endswith('.pdf'):
                         result['reason'] = 'UNSAFE_OR_NON_PDF_NAME'
                     elif unsafe_link(info) or not stat.S_ISREG(info.st_mode):
@@ -126,6 +128,8 @@ def scan_metadata(root, max_entries, max_pdf_bytes):
                         result['reason'] = 'CLOUD_PLACEHOLDER'
                     elif not 0 < info.st_size <= max_pdf_bytes:
                         result['reason'] = 'EMPTY_OR_OVERSIZED_PDF'
+                    elif not info.st_ino:
+                        result['reason'] = 'PDF_FILE_ID_UNAVAILABLE'
                     else:
                         result.update(size=info.st_size, identity=list(identity(info)))
                 except OSError:

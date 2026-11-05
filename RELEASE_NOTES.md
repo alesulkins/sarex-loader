@@ -5,13 +5,13 @@
 Собрать клиентский архив на Mac из корня проекта:
 
 ```sh
-.venv/bin/python tools/build_release.py --platform macos --output dist/sarex-loader-v0.1.0-rc.3-macos.zip
-.venv/bin/python tools/build_release.py --platform windows --output dist/sarex-loader-v0.1.0-rc.3-windows.zip
+.venv/bin/python tools/build_release.py --platform macos --output dist/sarex-loader-v0.1.0-rc.4-macos.zip
+.venv/bin/python tools/build_release.py --platform windows --output dist/sarex-loader-v0.1.0-rc.4-windows.zip
 ```
 
 Архив по умолчанию содержит пустую авторизацию. Если нужно передать именно текущую учётную запись в закрытой поставке, добавьте `--include-account` и используйте другое, ещё не существующее имя ZIP. Конфиг никогда не отправляется в Windows CI. Не размещайте такой архив публично.
 
-GitHub → Releases → Draft a new release → Choose a tag → создайте `v0.1.0-rc.3` от проверенного коммита main. Заголовок: `Sarex Loader v0.1.0-rc.3 — предварительная проверка`. Прикрепите оба ZIP и файл SHA256SUMS.txt, отметьте **Set as a pre-release**. Проверьте приватность репозитория перед Publish release. Это не финальная рабочая версия.
+GitHub → Releases → Draft a new release → Choose a tag → создайте `v0.1.0-rc.4` от проверенного коммита main. Заголовок: `Sarex Loader v0.1.0-rc.4 — предварительная проверка`. Прикрепите оба ZIP и файл SHA256SUMS.txt, отметьте **Set as a pre-release**. Проверьте приватность репозитория перед Publish release. Это не финальная рабочая версия.
 
 Текст для описания релиза:
 
@@ -36,3 +36,10 @@ GitHub → Releases → Draft a new release → Choose a tag → создайт�
 - Исправлена маршрутизация `python -m sarex_loader -test-pdf`.
 - Actions обновлены для Node.js 24; журнал задания создаётся до установки, вывод CLI сохраняется при сбое.
 - Нужен новый Run workflow после push. Re-run старого запуска использует прежний коммит. До зелёного Windows runner новая версия остаётся предварительной; полная Windows-загрузка всё ещё выключена и требует отдельной доработки и приёмки.
+
+## Исправление сопоставления Windows — rc.4
+
+- Вместо `DirEntry.stat()` используются свежие метаданные `os.stat(..., follow_symlinks=False)`: нулевые Windows ID больше не превращают разные PDF в ложные дубликаты. Настоящие hard-link дубликаты по-прежнему выявляются.
+- Независимые проверки CI выполняются даже после отказа соседнего шага; при сбое сопоставления сохраняются фактические статусы и причины.
+- Добавлена инструкция приёмки ACCEPTANCE.md. Пользователь сообщил об успешной отправке нового синтетического теста в 99-Тест; новых серверных операций в этом исправлении нет.
+- Нативный Windows-прогон исправленной версии ещё требуется. Производственная загрузка и создание папок не включены.

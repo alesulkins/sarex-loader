@@ -19,7 +19,7 @@ def run(output):
         root = Path(temporary)
         archive = root / 'customer.zip'
         result = build(Path(__file__).resolve().parents[1], archive,
-                       'v0.1.0-rc.3', platform=platform)
+                       'v0.1.0-rc.4', platform=platform)
         with ZipFile(archive) as package:
             if package.testzip() is not None:
                 raise RuntimeError('Corrupt release archive')
@@ -45,7 +45,7 @@ def run(output):
                 capture_output=True, timeout=60, check=False)
             if launched.returncode:
                 raise RuntimeError('Native BAT launcher failed')
-        delivered = output.parent / f'sarex-loader-v0.1.0-rc.3-{platform}.zip'
+        delivered = output.parent / f'sarex-loader-v0.1.0-rc.4-{platform}.zip'
         with delivered.open('xb') as stream, archive.open('rb') as source:
             shutil.copyfileobj(source, stream)
         result = {k: v for k, v in result.items() if k != 'file'}
