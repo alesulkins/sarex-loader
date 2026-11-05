@@ -45,8 +45,11 @@ def main(argv=None):
     try:
         root = Path(__file__).resolve().parent
         python = prepare(root)
+        environment = dict(os.environ)
+        environment['SAREX_ACCOUNT_FILE'] = str(root / 'account.toml')
         return subprocess.run([str(python), '-m', 'sarex_loader.customer_start',  # noqa: S603
-                               *(sys.argv[1:] if argv is None else argv)], check=False).returncode
+                               *(sys.argv[1:] if argv is None else argv)],
+                              env=environment, check=False).returncode
     except (OSError, subprocess.SubprocessError, UnicodeError):
         print('Не удалось подготовить программу. Проверьте Python, доступ к папке и интернет; '
               'затем повторите запуск. Входные документы не изменялись.')

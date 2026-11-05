@@ -67,7 +67,13 @@ def infer_month_name(children, month, *, parent_id=None, parent_path=()):
     style = known[0][2]
     latest = max(known, key=lambda k: k[1])
     word = MONTHS[int(month[-2:]) - 1]
-    if any(word in name.casefold() or month in name for name in unknown):
+    conflicting_unknown = unknown
+    if parent_id == 2067277 and 2067117 in parent_path:
+        # Confirmed continuation from April 2026: these exact older labels remain
+        # disclosed without inventing a year; they cannot consume future numbers.
+        legacy = {'1. Сентябрь', '2. Октябрь', '3. Ноябрь'}
+        conflicting_unknown = [name for name in unknown if name not in legacy]
+    if any(word in name.casefold() or month in name for name in conflicting_unknown):
         return {'status': 'MONTH_NAMING_AMBIGUOUS', 'name': None,
                 'unparsed_names': unknown}
     if style[0] == 'iso':
@@ -76,15 +82,22 @@ def infer_month_name(children, month, *, parent_id=None, parent_path=()):
         label = (word.capitalize() if style[2] == 'title' else word) + ' ' + month[:4]
         if style[0] == 'numbered':
             offsets = {n - month_number(parsed) for _, parsed, _, n in known}
-            # Approved exception only in VK / 06-МГ / РСУ.МГ. Never infer this policy
-            # from an irregular sequence at an arbitrary parent.
-            if parent_id == 6108617 and 2067117 in parent_path:
+            # Explicitly confirmed VK exceptions. Other branches remain strict.
+            exceptions = {
+                6108617: {'2026-02': 1, '2026-04': 2, '2026-05': 3},
+                6217793: {'2026-03': 1, '2026-05': 2, '2026-06': 3},
+                2067277: {'2024-03': 4, '2024-04': 5, '2024-05': 6,
+                          '2024-06': 7, '2024-11': 8, '2025-07': 9, '2026-04': 10},
+            }
+            if parent_id in exceptions and 2067117 in parent_path:
                 anchors = {parsed: n for _, parsed, _, n in known}
-                required = {'2026-02': 1, '2026-04': 2, '2026-05': 3}
-                anchor_offset = 3 - month_number('2026-05')
-                if (any(anchors.get(m) != n for m, n in required.items())
-                        or target <= month_number('2026-05')
-                        or any(m not in required and (m <= '2026-05'
+                required = exceptions[parent_id]
+                anchor_month = max(required)
+                anchor_offset = required[anchor_month] - month_number(anchor_month)
+                if (any(anchors[m] != n for m, n in required.items() if m in anchors)
+                        or max(anchors) < anchor_month
+                        or target <= month_number(anchor_month)
+                        or any(m not in required and (m <= anchor_month
                                or n - month_number(m) != anchor_offset)
                                for m, n in anchors.items())):
                     return {'status': 'MONTH_EXCEPTION_CONFLICT', 'name': None}

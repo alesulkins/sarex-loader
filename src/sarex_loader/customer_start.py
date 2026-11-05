@@ -4,7 +4,7 @@ import sys
 
 from sarex_loader import customer_launcher
 from sarex_loader.safety import ValidationError
-from sarex_loader.user_settings import settings_path
+from sarex_loader.user_settings import settings_configured, settings_path
 
 MENU = '''Sarex Loader
 1 — Проверить PDF СК (без загрузки)
@@ -41,7 +41,7 @@ def main(argv=None, *, ask=input):
                     break
                 print('Выберите СК или ВК.')
         if (len(argv) >= 2 and argv[0] in {'-preview', '-fill'} and argv[1] in {'sk', 'vk'}
-                and not settings_path().exists()):
+                and not settings_configured(settings_path())):
             print('Первый запуск: укажите учётную запись Sarex. Настройки сохранятся локально.')
             result = customer_launcher.main(['-setup'])
             if result:

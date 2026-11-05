@@ -1,5 +1,6 @@
 """Expected linear-time exact matching, with shared candidate and collision tables."""
 
+import re
 from collections import Counter, defaultdict
 
 from sarex_loader.folder_resolver import FolderRules, collision_key, safe_component
@@ -22,13 +23,15 @@ def validate_separator(separator: object) -> str:
 def extract_number(filename: str, separator: str) -> str | None:
     """Last literal delimiter + nonempty exact suffix immediately before .pdf.
 
-    No stripping, case folding, transliteration, slash substitution or numeric conversion.
-    This configurable grammar is a local policy, unconfirmed on real customer PDFs.
+    Only user-confirmed leading ASCII spaces before an all-digit suffix are ignored.
+    No case folding, transliteration, slash substitution or numeric conversion.
     """
     validate_separator(separator)
     if not safe_component(filename) or not filename.lower().endswith('.pdf'):
         return None
     prefix, found, number = filename[:-4].rpartition(separator)
+    if re.fullmatch(r' +[0-9]+', number):
+        number = number.lstrip(' ')
     if not found or not prefix or not safe_component(number):
         return None
     return number

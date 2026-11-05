@@ -1,0 +1,13 @@
+# Учётная запись для согласованной приватной поставки. Заполнится через start.py -setup.
+version = 1
+allow_folder_creation = false
+
+[auth]
+login = ""
+password = ""
+
+[profiles.sk]
+root_url = "https://lk.sarex.io/documentations/2066367"
+
+[profiles.vk]
+root_url = "https://lk.sarex.io/documentations/2067117"

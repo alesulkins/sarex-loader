@@ -6,7 +6,7 @@ select another Excel row, or grant permission to upload/create anything.
 
 import re
 
-VERSION = 'filename-context-v1'
+VERSION = 'filename-context-v2'
 ROOTS = {2066367, 2067117}
 SCOPES = {'овн', 'опв', 'пад', 'нк', 'вк', 'гтс', 'мост', 'мад',
           'ад', 'екпв', 'хе', 'пн', 'пе', 'пруд', 'накопитель'}
@@ -25,7 +25,8 @@ def families(value):
         'СМИ': {'сми', 'союзмаш'}, 'НТГ': {'нтг', 'нерудтрейдгрупп'},
         'ИТЭ': {'итэ', 'интертехэлектро'}, 'Новолекс': {'новолекс'},
         'Энергосервис': {'энергосервис'}, 'ТСМ': {'тсм', 'таймырстроймонтаж'},
-        'КРОК': {'крок'}, 'СиТЭК': {'ситэк'},
+        'КРОК': {'крок'}, 'СиТЭК': {'ситэк'}, 'КСТ': {'кст'},
+        'Телеком': {'телеком'},
     }.items():
         if set(tokens) & variants:
             found.add(family)
@@ -74,10 +75,22 @@ def filename_route_checks(filename, record, root_id):
     if expected & {'Хедмайнер', 'ФН Сервис'}:
         if ('овн' in scope and observed_scope != {'овн'}
                 or 'нк' in scope and observed_scope != {'нк'}
+                or 'гтс' in scope and observed_scope != {'гтс'}
                 or not scope & {'овн', 'нк'} and observed_scope & {'овн', 'нк'}):
             reject('PDF_PROJECT_SCOPE_MISMATCH')
         # No GTS/OVN/NK/MOST/MAD fallback into the approved OPV/PAD branch.
         if scope & {'опв', 'пад'} and observed_scope & {'гтс', 'мост', 'мад'}:
+            reject('PDF_PROJECT_SCOPE_MISMATCH')
+    if 'НТГ' in expected and tokens & {'мост', 'мад', 'пад'}:
+        if tokens & {'мост', 'мад', 'пад'} != scope & {'мост', 'мад', 'пад'}:
+            reject('PDF_PROJECT_SCOPE_MISMATCH')
+    if 'БиДжи' in expected:
+        expected_scope = set(words(record.get('contractor'))) & {'вжк', 'мг'}
+        if tokens & {'вжк', 'мг'} and expected_scope and (
+                tokens & {'вжк', 'мг'} != expected_scope):
+            reject('PDF_PROJECT_SCOPE_MISMATCH')
+    if 'водозабор' in tokens and 'водозабор' not in words(record.get('contractor')):
+        if expected != {'КСТ'}:
             reject('PDF_PROJECT_SCOPE_MISMATCH')
     if office == 'мг' and expected & {'РСУ', 'ЮСР', 'БиДжи'} and 'мг' not in tokens:
         reject('PDF_MG_CONTEXT_UNVERIFIED')

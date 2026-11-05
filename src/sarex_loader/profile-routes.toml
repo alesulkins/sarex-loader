@@ -46,6 +46,13 @@ root_id = "2066367"
 "ООО \"Хедмайнер\" (НК)" = "Хедмайнер (НК) (р.Шуман)"
 "ООО \"СК \"ТаймырСтройМонтаж\"" = "ТСМ"
 
+"ООО \"КСТ\"" = "КСТ"
+"РСУ (Водозабор)" = "РСУ (Водозабор)"
+"ООО \"НерудТрейдГрупп\" (МОСТ)" = "НерудТрейдГрупп (МОСТ)"
+"ООО \"НерудТрейдГрупп\" (МАД)" = "НерудТрейдГрупп (МАД)"
+"ООО \"НЕРУД ТРЕЙД ГРУПП\"" = "Неруд Трейд Групп"
+"ООО \"Хедмайнер\" (ГТС)" = "Хедмайнер (ГТС)"
+
 [[registries.folder_routes]]
 office = "01-ОФ"
 contractor = "РТИ"
@@ -148,12 +155,55 @@ office = "04-ИиТС (И)"
 contractor = "ТСМ"
 components = ["{office}", "{contractor}", "Инспекции", "{month}"]
 
+
+# Разрешены только эти сочетания; отсутствие отдельной компании остаётся пропуском.
+
+[[registries.folder_routes]]
+office = "04-ИиТС (И)"
+contractor = "КСТ"
+components = ["{office}", "{company}", "Инспекции", "{month}"]
+
+[[registries.folder_routes]]
+office = "04-ИиТС (И)"
+contractor = "РСУ (Водозабор)"
+components = ["{office}", "{company}", "Инспекции", "{month}"]
+
+[[registries.folder_routes]]
+office = "03-ИиТС (ТС)"
+contractor = "НерудТрейдГрупп (МОСТ)"
+components = ["{office}", "{company}", "Инспекции", "{month}"]
+
+[[registries.folder_routes]]
+office = "03-ИиТС (ТС)"
+contractor = "НерудТрейдГрупп (МАД)"
+components = ["{office}", "{company}", "Инспекции", "{month}"]
+
+[[registries.folder_routes]]
+office = "03-ИиТС (ТС)"
+contractor = "Неруд Трейд Групп"
+components = ["{office}", "{company}", "Инспекции", "{month}"]
+
+[[registries.folder_routes]]
+office = "03-ИиТС (ТС)"
+contractor = "Хедмайнер (ГТС)"
+components = ["{office}", "{company}", "Инспекции", "{month}"]
+
+[[registries.folder_routes]]
+office = "03-ИиТС (ТС)"
+contractor = "РСУ (ЧГРК)"
+components = ["{office}", "{company}", "Инспекции", "{month}"]
+
+[[registries.folder_routes]]
+office = "04-ИиТС (И)"
+contractor = "КРОК (ИТИиСС)"
+components = ["{office}", "{contractor}", "Инспекции", "{month}"]
 [[registries]]
 excel = "registry-vk.xlsx"
 inspection_type = "vk"
 root_id = "2067117"
 
 [registries.office_folders]
+"ИТ" = "07-ИТ"
 "ОФ" = "01-ОФ"
 "ИиТС (И)" = "04-ППИ/ИиТС(И)"
 "ТЭЦ" = "02-ТЭЦ"
@@ -183,6 +233,17 @@ root_id = "2067117"
 "ООО \"ЮСР\"" = "ООО ЮСР"
 "ООО \"ЮСР\" (МГ)" = "ООО ЮСР"
 "ООО НПО \"СиТЭК\"" = "ООО НПО СиТЭК"
+
+"ООО \"КСТ\"" = "КСТ"
+"РСУ (Водозабор)" = "РСУ (Водозабор)"
+"ООО \"НерудТрейдГрупп\" (МОСТ)" = "НерудТрейдГрупп (МОСТ)"
+"ООО \"НерудТрейдГрупп\" (МАД)" = "НерудТрейдГрупп (МАД)"
+"ООО \"НЕРУД ТРЕЙД ГРУПП\"" = "Неруд Трейд Групп"
+"ООО \"Хедмайнер\" (ГТС)" = "Хедмайнер (ГТС)"
+"ООО \"НерудТрейдГрупп\" (ПАД)" = "НерудТрейдГрупп (ПАД)"
+"ООО \"НЕРУД ТРЕЙД ГРУПП\" (ПАД)" = "НерудТрейдГрупп (ПАД)"
+"ООО \"БиДжи ИНЖИНИРИНГ\" (ВЖК)" = "БиДжи Инжиниринг (ВЖК)"
+"АО \"Норильск-Телеком\"" = "Норильск-Телеком"
 
 [[registries.folder_routes]]
 office = "01-ОФ"
@@ -263,6 +324,63 @@ components = ["{office}", "{month}"]
 office = "06-МГ"
 contractor = "ООО ЮСР"
 components = ["{office}", "{contractor}", "{month}"]
+
+# Разрешены только эти сочетания; отсутствие отдельной компании остаётся пропуском.
+
+[[registries.folder_routes]]
+office = "04-ППИ/ИиТС(И)"
+contractor = "КСТ"
+components = ["{office}", "{company}", "{month}"]
+
+[[registries.folder_routes]]
+office = "04-ППИ/ИиТС(И)"
+contractor = "РСУ (Водозабор)"
+components = ["{office}", "{company}", "{month}"]
+
+[[registries.folder_routes]]
+office = "03-ОГР/ИиТС(ТС)"
+contractor = "НерудТрейдГрупп (МОСТ)"
+components = ["{office}", "{company}", "{month}"]
+
+[[registries.folder_routes]]
+office = "03-ОГР/ИиТС(ТС)"
+contractor = "НерудТрейдГрупп (МАД)"
+components = ["{office}", "{company}", "{month}"]
+
+[[registries.folder_routes]]
+office = "03-ОГР/ИиТС(ТС)"
+contractor = "Неруд Трейд Групп"
+components = ["{office}", "{company}", "{month}"]
+
+[[registries.folder_routes]]
+office = "03-ОГР/ИиТС(ТС)"
+contractor = "Хедмайнер (ГТС)"
+components = ["{office}", "{company}", "{month}"]
+
+[[registries.folder_routes]]
+office = "03-ОГР/ИиТС(ТС)"
+contractor = "РСУ (ЧГРК)"
+components = ["{office}", "{company}", "{month}"]
+
+[[registries.folder_routes]]
+office = "03-ОГР/ИиТС(ТС)"
+contractor = "НерудТрейдГрупп (ПАД)"
+components = ["{office}", "{company}", "{month}"]
+
+[[registries.folder_routes]]
+office = "04-ППИ/ИиТС(И)"
+contractor = "БиДжи Инжиниринг (ВЖК)"
+components = ["{office}", "{company}", "{month}"]
+
+[[registries.folder_routes]]
+office = "04-ППИ/ИиТС(И)"
+contractor = "КРОК (ИТИиСС)"
+components = ["{office}", "{contractor}", "{month}"]
+
+[[registries.folder_routes]]
+office = "07-ИТ"
+contractor = "Норильск-Телеком"
+components = ["{office}", "{month}"]
 
 [tree]
 source = "gateway"

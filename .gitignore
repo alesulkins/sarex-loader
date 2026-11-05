@@ -6,6 +6,7 @@
 !/pyproject.toml
 !/MANIFEST.in
 !/customer.routes.toml
+!/account.toml
 !/start.py
 !/start.bat
 !/start.command
@@ -20,7 +21,7 @@
 !/src/sarex_loader/profile-routes.toml
 !/src/sarex_loader/browser_extension.js
 
-# Credentials, customer inputs and runtime state are never distributed.
+# Customer inputs and runtime state remain local. account.toml is explicitly distributed.
 __pycache__/
 *.py[cod]
 .env
@@ -29,8 +30,6 @@ __pycache__/
 *.key
 *.p12
 *.pfx
-settings.toml
-*.local.toml
 *.sqlite*
 *.db
 *.xlsx

@@ -15,7 +15,7 @@ from sarex_loader.pdf_route_guard import destination_check
 from sarex_loader.pdf_scan import identity, scan_pdfs
 from sarex_loader.safety import ValidationError
 
-RULE_VERSION = 'stage5-exact-filename-v1'
+RULE_VERSION = 'stage5-exact-filename-v2'
 
 
 def _row_status(index, candidate):

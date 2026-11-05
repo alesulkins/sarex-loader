@@ -1,4 +1,4 @@
-include pyproject.toml MANIFEST.in customer.routes.toml
+include pyproject.toml MANIFEST.in customer.routes.toml account.toml
 include start.py start.bat start.command setup.bat start-upload.bat start-fill-urls.bat
 recursive-include src/sarex_loader *.py
 include src/sarex_loader/profile-routes.toml src/sarex_loader/browser_extension.js
@@ -13,5 +13,5 @@ prune reports
 prune logs
 prune journal
 global-exclude *.md *.xlsx *.xls *.xlsm *.pdf *.docx *.sqlite* *.db *.log
-global-exclude *.pem *.key .env .env.* *.local.toml settings.toml
+global-exclude *.pem *.key .env .env.*
 global-exclude __pycache__ *.py[cod]

@@ -1,4 +1,4 @@
-"""One private local user configuration. Secrets never enter plans or reports."""
+"""Local or explicitly distributed account. Secrets never enter plans or reports."""
 
 import csv
 import getpass
@@ -28,13 +28,46 @@ class UserSettings:
 
 
 def settings_path():
-    # No credentials are read from environment; LOCALAPPDATA selects a local directory only.
+    # Only paths are read from environment, never passwords/tokens.
+    if account := distribution_account_path():
+        return account
+    # LOCALAPPDATA selects a local directory only.
     if os.name == 'nt':
         base = os.environ.get('LOCALAPPDATA')
         if not base:
             raise ValidationError('Не определена локальная папка настроек Windows.')
         return local_path(base) / 'SarexLoader' / 'settings.toml'
     return Path.home() / '.config' / 'sarex-loader' / 'settings.toml'
+
+
+def distribution_account_path():
+    if value := os.environ.get('SAREX_ACCOUNT_FILE'):
+        return local_path(value)
+    # Direct short commands from the extracted project use the same account as start.py.
+    root = Path.cwd()
+    if (root / 'start.py').is_file() and (root / 'customer.routes.toml').is_file():
+        return root / 'account.toml'
+    return None
+
+
+def _distribution_path(path):
+    value = distribution_account_path()
+    return bool(value and value.absolute() == path.absolute())
+
+
+def settings_configured(path=None):
+    """An empty shipped account prompts setup; malformed/nonempty files fail closed."""
+    path = local_path(path or settings_path())
+    if not path.exists():
+        return False
+    if _distribution_path(path):
+        try:
+            data = tomllib.loads(read_snapshot(path, 65536).decode('utf-8'))
+        except (ValueError, UnicodeError):
+            raise ValidationError('Не удалось прочитать конфигурацию учётной записи.') from None
+        if data.get('auth') == {'login': '', 'password': ''}:
+            return False
+    return True
 
 
 def root_id_from_url(profile, url):
@@ -49,7 +82,7 @@ def root_id_from_url(profile, url):
 def load_settings(path=None):
     path = checked_path(local_path(path or settings_path()), directory=False)
     try:
-        if os.name != 'nt':
+        if os.name != 'nt' and not _distribution_path(path):
             for item in (path.parent, path):
                 info = item.lstat()
                 if info.st_uid != os.getuid() or stat.S_IMODE(info.st_mode) & 0o077:
@@ -96,20 +129,20 @@ def save_settings(settings, path=None):
     checked_path(path.parent, directory=True)
     if path.is_symlink():
         raise ValidationError('Настройки не могут быть символической ссылкой.')
-    if os.name == 'nt':
+    if os.name == 'nt' and not _distribution_path(path):
         try:
             _windows_private_folder(path.parent)
         except (OSError, subprocess.SubprocessError):
             raise ValidationError('Не удалось ограничить доступ к настройкам Windows; '
                                   'пароль не сохранён.') from None
-    else:
+    elif os.name != 'nt' and not _distribution_path(path):
         if path.parent.stat().st_uid != os.getuid():
             raise ValidationError('Папка настроек принадлежит другому пользователю.')
         path.parent.chmod(0o700)
     # JSON quoting is also valid TOML basic-string quoting; it is never shell text.
     def quote(value):
         return json.dumps(value, ensure_ascii=False)
-    raw = ('# Локальные учётные данные. Не отправляйте этот файл и не включайте в архив поставки.\n'
+    raw = ('# Учётная запись Sarex. Пароль не выводить в логи и отчёты.\n'
            'version = 1\nallow_folder_creation = '
            + str(settings.allow_folder_creation).lower()
            + '\n\n[auth]\nlogin = ' + quote(settings.username)
@@ -166,6 +199,6 @@ def setup(*, ask=input, password_reader=getpass.getpass, path=None):
 
 
 def require_settings(path=None):
-    if not local_path(path or settings_path()).exists():
+    if not settings_configured(path):
         raise ValidationError('Сначала выполните sarex-loader -setup.')
     return load_settings(path)

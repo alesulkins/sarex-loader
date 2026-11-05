@@ -48,6 +48,17 @@ def tree_component(value):
             and not any(unicodedata.category(c).startswith('C') for c in value))
 
 
+def company_key(value):
+    """Pending branches only: legal prefix, quotes, case and spacing; retain all scopes.
+
+    Never strip parenthesized project qualifiers, abbreviate companies or merge tokens
+    by substring. A collision always blocks resolution.
+    """
+    value = value.casefold().replace('"', '').replace('«', '').replace('»', '')
+    value = re.sub(r'^ооо +', '', value)
+    return value.replace(' ', '')
+
+
 def _aliases(mapping):
     if (type(mapping) is not dict or not mapping or any(
             not tree_component(k) or not tree_component(v) or '{' in v or '}' in v
@@ -120,7 +131,8 @@ class FolderRules:
             if (type(parts) not in (list, tuple) or not 1 <= len(parts) <= 32
                     or parts.count('{month}') != 1 or any(
                         not tree_component(p) or (('{' in p or '}' in p)
-                        and p not in {'{office}', '{contractor}', '{month}'}) for p in parts)):
+                        and p not in {'{office}', '{contractor}', '{company}', '{month}'})
+                        for p in parts)):
                 raise ValidationError('ROUTING_LAYOUTS_INVALID')
             validated = {**layout, 'components': tuple(parts)}
             if months is not None:
@@ -144,6 +156,7 @@ class FolderRules:
                 return None, 'AMBIGUOUS_ROUTE' if layouts else 'ROUTE_NOT_CONFIGURED'
             values = {'{office}': self.offices[office],
                       '{contractor}': self.contractors[contractor],
+                      '{company}': '{company:' + self.contractors[contractor] + '}',
                       '{month}': '{month:' + month + '}'}
             return {'root_id': self.root_id,
                     'components': [values.get(p, p) for p in layouts[0]['components']],
@@ -177,6 +190,7 @@ class FolderResolver:
         self.children = defaultdict(dict)
         self.names = defaultdict(set)
         self.months = defaultdict(set)
+        self.companies = defaultdict(set)
         self.queried_folders = set()
         self.metadata = []
         self.source_hashes = []
@@ -211,6 +225,7 @@ class FolderResolver:
                 self.children[parent][d.id] = d
                 if d.is_folder:
                     self.names[(parent, collision_key(d.name))].add(d.id)
+                    self.companies[(parent, company_key(d.name))].add(d.id)
                     month = calendar_month(d.name)
                     if month is not None:
                         self.months[(parent, month)].add(d.id)
@@ -222,6 +237,15 @@ class FolderResolver:
 
     def child(self, parent_id, name):
         self.lookups += 1
+        company = re.fullmatch(r'\{company:([^{}]+)\}', name)
+        if company:
+            ids = self.companies.get((parent_id, company_key(company[1])), ())
+            if len(ids) > 1:
+                return FolderResolution(None, 'AMBIGUOUS_FOLDER')
+            if len(ids) == 1:
+                d = self.documents[next(iter(ids))]
+                return FolderResolution(d.id, 'RESOLVED_IN_SNAPSHOT', d.path_ids)
+            return FolderResolution(None, 'FOLDER_NOT_RESOLVED_IN_SNAPSHOT')
         month = re.fullmatch(r'\{month:([0-9]{4}-(?:0[1-9]|1[0-2]))\}', name)
         if month:
             ids = self.months.get((parent_id, month[1]), ())

@@ -79,7 +79,8 @@ def route_details(index, root, parts, confirmed_missing):
                 'parent_id': None, 'full_path': full_path(index, resolution.folder_id),
                 'need_folder': False, 'naming': None}
     result = {'folder_status': resolution.status, 'folder_id': None, 'parent_id': None,
-              'full_path': full_path(index, root) + ' → ' + ' → '.join(parts),
+              'full_path': full_path(index, root) + ' → ' + ' → '.join(
+                  p[9:-1] if p.startswith('{company:') else p for p in parts),
               'need_folder': False, 'naming': None}
     if (resolution.status != 'FOLDER_NOT_RESOLVED_IN_SNAPSHOT' or not parts
             or not parts[-1].startswith('{month:') or not parts[-1].endswith('}')):
