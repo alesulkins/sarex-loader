@@ -56,7 +56,8 @@ def test_load_dry_run_uses_only_preview(monkeypatch, tmp_path):
     monkeypatch.setattr(launcher, 'collect_inputs',
                         lambda command, profile: calls.append(('inputs', command, profile)) or {})
     monkeypatch.setattr(launcher, 'run_profile',
-                        lambda command, profile, **kwargs: calls.append(('run', command, profile)))
+                        lambda command, profile, **kwargs:
+                        calls.append(('run', command, profile)) or {})
     for profile in ('sk', 'vk'):
         assert launcher.main(['-load', profile, '--dry-run']) == 0
         assert calls[-2:] == [('inputs', 'preview', profile), ('run', 'preview', profile)]

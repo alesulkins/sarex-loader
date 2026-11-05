@@ -145,9 +145,10 @@ class SingleTestHTTPSTransport(ReadOnlyHTTPSTransport):
 
     @classmethod
     def for_batch(cls, journal, key, *, confirmed=False, url_only=False, document_only=False,
-                  acceptance=False, customer_test=False):
+                  acceptance=False, customer_test=False, production=None):
         """Reuse the exact adapter, TLS, ordering and candidate capture for one batch item."""
         parent, path_ids, ledger = TEST_PARENT_ID, TEST_PATH_IDS, batch_journal_path()
+        root = TEST_ROOT_ID
         if (type(acceptance) is not bool or type(customer_test) is not bool
                 or acceptance and customer_test):
             raise ValidationError('Неверный тестовый режим.')
@@ -180,6 +181,13 @@ class SingleTestHTTPSTransport(ReadOnlyHTTPSTransport):
             validate_journal(journal)
             ledger = journal_path()
             parent, path_ids = validate_item(journal.operation(key))
+        if production is not None:
+            from sarex_loader.production_scope import ProductionScope, journal_path
+
+            if type(production) is not ProductionScope or acceptance or customer_test:
+                raise ValidationError('Нельзя смешивать рабочую и тестовую области.')
+            parent, path_ids = production.validate(journal, key)
+            root, ledger = production.root_id, journal_path()
         if (cls is not SingleTestHTTPSTransport or type(journal) is not Journal
                 or journal.path != ledger or type(url_only) is not bool
                 or type(document_only) is not bool or document_only and not url_only):
@@ -210,10 +218,12 @@ class SingleTestHTTPSTransport(ReadOnlyHTTPSTransport):
             raise ValidationError('BATCH_RECONCILIATION_REQUIRED')
         self = cls.__new__(cls)
         ReadOnlyHTTPSTransport.__init__(
-            self, ReadOnlyPolicy((parent, TEST_ROOT_ID)), confirmed=confirmed)
+            self, ReadOnlyPolicy((parent, root)), confirmed=confirmed)
         self._batch, self._batch_url_only = True, document_only
         self._acceptance = acceptance
         self._customer_test = customer_test
+        self._production = production
+        self._root_id = root
         self._parent_id, self._path_ids = parent, path_ids
         self._batch_document_policy = batch_document_policy(item) and state != 'OUTCOME_UNKNOWN'
         self._config = BundleDraft(TEST_DISK_ID, item['document_type'], item['file_key'],
@@ -225,7 +235,7 @@ class SingleTestHTTPSTransport(ReadOnlyHTTPSTransport):
         self._bundle, self._document = checkpoint['bundle_id'], identifier
         self.timeouts = Timeouts()
         self.max_response_bytes, self.max_requests = 1024**2, 8
-        self._preflight = [f'/v1/documents/{self._parent_id}', f'/v1/documents/{TEST_ROOT_ID}']
+        self._preflight = [f'/v1/documents/{self._parent_id}', f'/v1/documents/{root}']
         if self._phase == 'PLANNED':
             self._preflight.append('/v1/documents/types')
         self._cursor = 0
@@ -265,6 +275,8 @@ class SingleTestHTTPSTransport(ReadOnlyHTTPSTransport):
         if type(method) is not str or type(url) is not str \
                 or (method, url) != (expected_method, DOCUMENTATION_BASE + route):
             raise ApiError(ApiErrorCode.ACCESS_DENIED)
+        if method == 'POST' and getattr(self, '_production', None) is not None:
+            self._production.validate(self._journal, self._key)
         if method == 'POST' and getattr(self, '_customer_test', False):
             from sarex_loader.customer_test_scope import validate_journal
 
@@ -361,7 +373,10 @@ class SingleTestHTTPSTransport(ReadOnlyHTTPSTransport):
                 verify_target_document(parse_document(value), expected_path=self._path_ids)
                 self._target_checked_at = time.monotonic()
             else:
-                verify_root_document(parse_document(value))
+                if getattr(self, '_production', None) is not None:
+                    self._production.verify_root(value)
+                else:
+                    verify_root_document(parse_document(value))
             self._cursor += 1
             return
         if self._phase in {'PLANNED', 'FILE_SENT'}:
@@ -393,7 +408,8 @@ class SingleTestHTTPSTransport(ReadOnlyHTTPSTransport):
             verify_created_document(document, identifier, require_path=self._phase != 'FINISHED',
                                     expected_filename=self._config.filename,
                                     expected_path=self._path_ids)
-            if self._acceptance and self._phase != 'FINISHED':
+            if (self._acceptance or getattr(self, '_production', None) is not None) and (
+                    self._phase != 'FINISHED'):
                 if value.get('type') != 'pdf':
                     raise ValidationError('Тип созданного документа не подтверждён GET.')
                 self._response_diagnostic['verified_document'] = {

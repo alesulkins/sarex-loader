@@ -50,3 +50,25 @@ def read_snapshot(path: Path, limit: int) -> bytes:
                 return data
     except OSError:
         raise ValidationError("Не удалось безопасно прочитать локальный файл.") from None
+
+
+@contextmanager
+def pinned_directory(path):
+    """Hold the directory/ancestors against replacement on the native platform."""
+    if os.name == 'nt':
+        from sarex_loader.windows_files import locked_directory
+
+        with locked_directory(path) as pinned:
+            yield pinned
+    else:
+        with directory_fd(path) as fd:
+            yield fd
+
+
+def directory_stat(pinned):
+    return pinned.stat() if isinstance(pinned, Path) else os.fstat(pinned)
+
+
+def child_stat(pinned, name):
+    return (os.stat(pinned / name, follow_symlinks=False) if isinstance(pinned, Path)
+            else os.stat(name, dir_fd=pinned, follow_symlinks=False))

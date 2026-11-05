@@ -128,11 +128,12 @@ def run():
             missing.exists() and hashlib.sha256(target.read_bytes()).hexdigest() == before,
             "Collision did not preserve both files",
         )
-        # All subprocess arguments are fixed. Help and blocked production load never authenticate.
-        for args, code in [(["-help"], 0), (["-load", "sk"], 2), (["-load", "vk"], 2)]:
+        # No input means no account/paths/consent and therefore no network or mutations.
+        for args, code in [(["-help"], 0), (["-load", "sk"], 130), (["-load", "vk"], 130)]:
             completed = subprocess.run(  # noqa: S603
                 [sys.executable, "-m", "sarex_loader", *args],
                 capture_output=True,
+                input=b'',
                 timeout=20,
                 check=False,
             )
@@ -153,7 +154,7 @@ def run():
                 "other_sheets_and_style_preserved": True,
                 "move_content_preserved": True,
                 "overwrite_blocked": True,
-                "cli_load_blocked": True,
+                "cli_load_requires_input_and_consent": True,
             },
             "sarex_requests": 0,
             "native_upload_tested": False,

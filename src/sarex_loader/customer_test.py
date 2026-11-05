@@ -102,10 +102,6 @@ def prepare(index):
 
 
 def run(*, expected_plan=None, ask=input):
-    if os.name == 'nt':
-        raise ValidationError('Тестовая отправка на Windows пока не подключена: '
-                              'требуется перенос и проверка всей цепочки upload. '
-                              'Используйте -preview и Windows CI.')
     settings = require_settings()
     with use_settings(settings), gateway_login() as provider:
         index, evidence = read_targets(provider)

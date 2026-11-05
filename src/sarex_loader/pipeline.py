@@ -1,11 +1,10 @@
 """Audit/matching/target plan with optional read-only tree discovery; no uploader."""
 
 import hashlib
-import os
 from collections import Counter, defaultdict
 
 from sarex_loader.audit import audit_registry
-from sarex_loader.file_safety import directory_fd, read_snapshot
+from sarex_loader.file_safety import child_stat, directory_stat, pinned_directory, read_snapshot
 from sarex_loader.folder_resolver import FolderRules, collision_key
 from sarex_loader.journal import Journal, fingerprint
 from sarex_loader.matching import InspectionIndex, build_match_report, extract_number
@@ -35,13 +34,13 @@ def _verify_sources(config, registry, files, directory_identity):
         raise ValidationError('INPUT_CHANGED: исходный Excel изменился после аудита.')
     if directory_identity is None:
         return
-    with directory_fd(config.pdf_dir) as fd:
-        if identity(os.fstat(fd)) != directory_identity:
+    with pinned_directory(config.pdf_dir) as fd:
+        if identity(directory_stat(fd)) != directory_identity:
             raise ValidationError('INPUT_CHANGED: каталог PDF изменился после сканирования.')
         for item in files:
             if item['identity'] is not None:
                 try:
-                    info = os.stat(item['filename'], dir_fd=fd, follow_symlinks=False)
+                    info = child_stat(fd, item['filename'])
                 except OSError:
                     raise ValidationError('INPUT_CHANGED: PDF недоступен.') from None
                 if list(identity(info)) != item['identity']:
@@ -101,8 +100,8 @@ def build_plan(config, journal: Journal | None = None, *, read_tree=False,
     matched = None
     files = []
     if config.command == 'upload':
-        with directory_fd(config.pdf_dir) as fd:
-            directory_identity = identity(os.fstat(fd))
+        with pinned_directory(config.pdf_dir) as fd:
+            directory_identity = identity(directory_stat(fd))
         # Metadata only; PDF content is streamed once. Stable presentation costs M log M;
         # inspection indexing and hash lookups remain expected O(N + M).
         scanned = (scan_pdfs(config.pdf_dir, metadata_only=True) if pdf_metadata_only

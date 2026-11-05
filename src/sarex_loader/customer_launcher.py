@@ -14,8 +14,8 @@ HELP = '''Sarex Loader — отдельный запуск для СК (sk) ил
 sarex-loader -setup          Сохранить/изменить локальные логин и пароль.
 sarex-loader -preview sk     Проверить Excel и PDF СК, прочитать всё дерево СК.
 sarex-loader -preview vk     Проверить Excel и PDF ВК, прочитать всё дерево ВК.
-sarex-loader -load sk        Загрузка СК: временно заблокирована.
-sarex-loader -load vk        Загрузка ВК: временно заблокирована.
+sarex-loader -load sk        Проверить план СК и запросить разрешение загрузки.
+sarex-loader -load vk        Проверить план ВК и запросить разрешение загрузки.
 sarex-loader -load sk --dry-run  Проверка загрузки СК без отправки и перемещений.
 sarex-loader -load vk --dry-run  Проверка загрузки ВК без отправки и перемещений.
 sarex-loader -load test DIR  Просмотр фиксированного теста двух PDF в 99-Тест.
@@ -29,7 +29,8 @@ sarex-loader -help           Эта справка.
 Корень СК: https://lk.sarex.io/documentations/2066367
 Корень ВК: https://lk.sarex.io/documentations/2067117
 Preview показывает план перемещения в «не найдено», но ничего не перемещает.
-Подпапки PDF не обходятся. Содержимое PDF не меняется. Производственная запись запрещена.
+Подпапки PDF не обходятся. -load требует отдельного подтверждения плана перед записью.
+Создание папок отключено. -load перемещает доказанно отсутствующие номера в «не найдено».
 Для диагностики: sarex-loader -preview sk (флаг --no-move сохранён для совместимости).
 Продолжение прерванного обхода: добавьте --resume "путь к checkpoint".
 Пример: sarex-loader -preview sk → Excel СК → папка PDF СК → ссылка СК → результаты.
@@ -49,7 +50,7 @@ def collect_inputs(command, profile, *, ask=input):
     label = {'sk': 'СК', 'vk': 'ВК'}[profile]
     excel = ask_path(f'Полный локальный путь к Excel {label}: ', directory=False, ask=ask)
     pdf = (ask_path(f'Локальная папка PDF {label}: ', directory=True, ask=ask)
-           if command == 'preview' else None)
+           if command in ('preview', 'load') else None)
     while True:
         root_url = ask(f'Ссылка на корневую папку {label} в Sarex: ').strip()
         try:
@@ -100,14 +101,11 @@ def main(argv=None):
                 raise ValidationError('Флаг --dry-run применяется к -load sk/vk. '
                                       'Для просмотра используйте -preview sk/vk.')
             command = 'preview'
-        if command == 'load':
-            raise ValidationError('Реальная загрузка временно заблокирована. '
-                                  'Никакие запросы не отправлены. Используйте -preview ' + profile)
         settings = require_settings()
         inputs = collect_inputs(command, profile)
-        run_profile(command, profile, results=settings.results_dir,
-                    settings=settings, **inputs, **options)
-        return 0
+        result = run_profile(command, profile, results=settings.results_dir,
+                             settings=settings, **inputs, **options)
+        return 3 if result.get('stopped') else 0
     except (EOFError, KeyboardInterrupt):
         print('Работа прервана. Сохранённые журналы и файлы не удаляйте.')
         return 130

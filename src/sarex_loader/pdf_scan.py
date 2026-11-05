@@ -38,11 +38,12 @@ def scan_pdfs(root: Path, *, max_entries=MAX_ENTRIES, max_pdf_bytes=MAX_PDF_BYTE
     total = 0
     try:
         if os.name == 'nt':
-            if not metadata_only:
-                raise ValidationError('На Windows используйте клиентский просмотр без чтения PDF.')
             from sarex_loader.windows_files import scan_metadata
 
-            yield from scan_metadata(root, max_entries, max_pdf_bytes)
+            if metadata_only:
+                yield from scan_metadata(root, max_entries, max_pdf_bytes)
+            else:
+                yield from _windows_scan(root, max_entries, max_pdf_bytes, max_total_bytes)
             return
         with directory_fd(root) as parent:
             directory_before = identity(os.fstat(parent))
@@ -109,3 +110,25 @@ def scan_pdfs(root: Path, *, max_entries=MAX_ENTRIES, max_pdf_bytes=MAX_PDF_BYTE
                 raise ValidationError('Каталог PDF изменился при обходе; повторите аудит.')
     except OSError:
         raise ValidationError('Не удалось безопасно обойти локальный каталог PDF.') from None
+
+
+def _windows_scan(root, max_entries, max_pdf_bytes, max_total_bytes):
+    from sarex_loader.api_models import ApiError
+    from sarex_loader.multipart import MultipartPDF
+    from sarex_loader.windows_files import scan_metadata
+
+    total = 0
+    for item in scan_metadata(root, max_entries, max_pdf_bytes):
+        if item['reason'] is None:
+            total += item['size']
+            if total > max_total_bytes:
+                raise ValidationError('Превышен общий лимит чтения PDF.')
+            try:
+                with MultipartPDF(root, root / item['filename']) as body:
+                    if list(body._identity) != item['identity']:
+                        item['reason'] = 'PDF_CHANGED'
+                    else:
+                        item['sha256'] = body.sha256
+            except ApiError:
+                item['reason'] = 'PDF_UNREADABLE_OR_CHANGED'
+        yield item

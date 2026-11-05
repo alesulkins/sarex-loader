@@ -2,7 +2,6 @@
 
 import hashlib
 import json
-import os
 import sys
 from functools import partial
 
@@ -10,7 +9,7 @@ from sarex_loader.api_client import ApiSettings, SarexClient
 from sarex_loader.api_models import ApiError, ApiErrorCode
 from sarex_loader.api_transport import BearerToken
 from sarex_loader.excel_copy import URLUpdate, make_url_copy
-from sarex_loader.file_safety import directory_fd, read_snapshot
+from sarex_loader.file_safety import child_stat, pinned_directory, read_snapshot
 from sarex_loader.journal import (
     BATCH_CONFIRMATION_POLICY,
     BATCH_DOCUMENT_STATES,
@@ -31,8 +30,8 @@ PHASES = {
 
 
 def _excel_identity(config):
-    with directory_fd(config.excel.parent) as fd:
-        return identity(os.stat(config.excel.name, dir_fd=fd, follow_symlinks=False))
+    with pinned_directory(config.excel.parent) as fd:
+        return identity(child_stat(fd, config.excel.name))
 
 
 def _perform(phase, client, target, body):
@@ -114,7 +113,7 @@ def run_upload_workflow(config, *, simulate: bool = False,
         raise ValidationError('Для mock-upload нужны journal_dir и новый output_dir.')
     if config.output_dir.exists() or config.output_dir.is_symlink():
         raise ValidationError('Выходной каталог уже существует; перезапись запрещена.')
-    with directory_fd(config.output_dir.parent):
+    with pinned_directory(config.output_dir.parent):
         pass
     with Journal(config.journal_dir, [config.input_root]) as journal:
         report = build_plan(config, journal, read_tree=read_tree)
@@ -259,7 +258,7 @@ def _single_upload(config, single, *, confirmed, expected_plan, register=False,
             output.is_relative_to(p) or p.is_relative_to(output)
             for p in (config.input_root, fixed_journal))):
         raise ValidationError('Нужен отдельный новый выходной каталог.')
-    with directory_fd(output.parent):
+    with pinned_directory(output.parent):
         pass
     # Read-only URL recovery expects the candidate to exist. This exception cannot
     # reach uploads: confirmed/register/recover combinations were rejected above.
@@ -561,7 +560,7 @@ def run_batch_upload(config, options, *, confirmed=False, expected_plan=None,
             output.is_relative_to(p) or p.is_relative_to(output)
             for p in (config.input_root, path)):
         raise ValidationError('BATCH_NEW_OUTPUT_REQUIRED')
-    with directory_fd(output.parent):
+    with pinned_directory(output.parent):
         pass
     snapshot = read_snapshot(config.excel, config.max_file_bytes)
     make_url_copy(snapshot, report['registry']['sha256'], [])
@@ -642,7 +641,8 @@ def _authenticated_batch(config, options, report, operations, journal, recover, 
 
 
 def _execute_batch(config, options, report, operations, journal, recover, document_only,
-                   token_provider, *, acceptance=False, customer_test=False):
+                   token_provider, *, acceptance=False, customer_test=False, production=None,
+                   verify_sources=None, on_confirm=None, stop_requested=None):
     """Shared sequential loader; transport owns every mutation authorization."""
     from sarex_loader.read_only_policy import DOCUMENTATION_BASE
     from sarex_loader.single_test_scope import TEST_DISK_ID, TEST_ROOT_ID
@@ -652,6 +652,9 @@ def _execute_batch(config, options, report, operations, journal, recover, docume
     # Recheck existing documents before starting ANY independent new PDF.
     ordered = sorted(operations, key=lambda k: journal.checkpoint(k)['state'] == 'PLANNED')
     for key in ordered:
+        if stop_requested is not None and stop_requested():
+            result['stopped'] = True
+            break
         item = operations[key]
         checkpoint = journal.checkpoint(key)
         if item['status'] != 'LOCAL_MATCH':
@@ -666,19 +669,22 @@ def _execute_batch(config, options, report, operations, journal, recover, docume
                 and result['uploaded'] >= options['max_documents']):
             continue
         def verify():
-            _verify_sources(config, report['registry'], report['matching']['files'],
-                            report['pdf_directory_identity'])
+            if verify_sources is not None:
+                verify_sources()
+            else:
+                _verify_sources(config, report['registry'], report['matching']['files'],
+                                report['pdf_directory_identity'])
         try:
             verify()
             transport = SingleTestHTTPSTransport.for_batch(
                 journal, key, confirmed=True, url_only=recover, document_only=document_only,
-                    acceptance=acceptance, customer_test=customer_test)
+                    acceptance=acceptance, customer_test=customer_test, production=production)
             client = SarexClient(ApiSettings(DOCUMENTATION_BASE, ('https://api.sarex.io',)),
                                  transport=transport,
                                  token_provider=token_provider,
                                  single_test_network_enabled=True)
             client.get_document(item['resolved_folder_id'])
-            client.get_document(TEST_ROOT_ID)
+            client.get_document(production.root_id if production is not None else TEST_ROOT_ID)
             if state == 'PLANNED':
                 client.get_document_types()
             while not recover and checkpoint['state'] in PHASES:
@@ -718,12 +724,19 @@ def _execute_batch(config, options, report, operations, journal, recover, docume
                     key, identifier, bundle_link_confirmed=
                     transport.response_diagnostic['bundle_link_confirmed'])
             result['urls'][key] = identifier
+            result['already_confirmed' if state != 'PLANNED' else 'uploaded'] += 1
+            if on_confirm is not None:
+                on_confirm(key, identifier)
             if acceptance:
                 result.setdefault('get_verified_documents', {})[key] = (
                     transport.response_diagnostic['verified_document'])
-            result['already_confirmed' if state != 'PLANNED' else 'uploaded'] += 1
         except (ApiError, ValidationError) as exc:
             result['errors'].append({'operation': key, 'code': str(exc)})
+            if (production is not None and isinstance(exc, ApiError)
+                    and journal.checkpoint(key)['state'] == 'PLANNED'):
+                # A failed read/source check before any POST affects this PDF only.
+                # Once an intent exists, all uncertain states still stop the run.
+                continue
             result['stopped'] = True
             break  # Even a GET failure stops this run; no subsequent resource mutation.
     return result

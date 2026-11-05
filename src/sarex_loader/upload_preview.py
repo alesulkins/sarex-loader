@@ -362,7 +362,18 @@ def preview_payloads(report):
               'already_in_sarex': 'Совпадение имени/номера уже найдено в Sarex',
               'requires_folder': 'Подтверждённо требуется месячная папка',
               'missing_month_unconfirmed': 'Отсутствие месяца не подтверждено',
-              'date_conflicts': 'Конфликт даты PDF и Excel', 'problem_files': 'Проблемные файлы'}
+              'date_conflicts': 'Конфликт даты PDF и Excel', 'problem_files': 'Проблемные файлы',
+              'uploaded': 'Загружено PDF', 'urls_written': 'URL сохранены в Excel',
+              'already_confirmed': 'Подтверждены повторно без загрузки'}
+    if report.get('mode') == 'PRODUCTION_UPLOAD':
+        lines[0] = '# Результат загрузки PDF'
+        lines[2] = ('PDF прочитаны последовательно для проверки подписи и SHA-256. '
+                    'Результат каждой отправки подтверждается GET; URL сохраняется в переданный '
+                    'Excel с резервной копией. Создание папок отключено. Абсолютная полнота '
+                    'Gateway не доказана; принят остаточный риск завершённого обхода. '
+                    + ('План отменён.' if report.get('cancelled') else
+                       'Запуск остановлен; журнал не сбрасывайте.'
+                       if report.get('stopped') else ''))
     lines += [f'| {labels[k]} | {v} |' for k, v in report['counts'].items()]
     if report.get('local_move_plan') and not report.get('local_moves_enabled'):
         lines += ['', '## План перемещения — не выполнен', '',

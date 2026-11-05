@@ -2,7 +2,7 @@
 
 import os
 import shutil
-from contextlib import redirect_stdout
+from contextlib import redirect_stderr, redirect_stdout
 from datetime import datetime
 from pathlib import Path
 from zipfile import ZIP_DEFLATED, ZipFile
@@ -73,7 +73,8 @@ def execute_with_reports(worker, command, profile, excel, root_url, results, set
     print('Начало проверки. Отчёты: ' + str(root))
     print('Подробный ход работы: ' + str(log))
     try:
-        with log.open('x', encoding='utf-8', buffering=1) as stream, redirect_stdout(stream):
+        with (log.open('x', encoding='utf-8', buffering=1) as stream,
+              redirect_stdout(stream), redirect_stderr(stream)):
             report = worker(command, profile, excel, root_url, technical, settings,
                             pdf=pdf, no_move=no_move, resume=resume)
         output = Path(report['output_directory'])
@@ -95,9 +96,12 @@ def execute_with_reports(worker, command, profile, excel, root_url, results, set
                   'missing_month_unconfirmed': 'Отсутствие месяца не подтверждено',
                   'date_conflicts': 'Конфликты дат', 'problem_files': 'Проблемные PDF',
                   'MATCHED': 'Однозначное совпадение', 'AMBIGUOUS': 'Неоднозначное совпадение',
-                  'NOT_FOUND': 'Не найдено', 'SKIPPED': 'Пропущено'}
+                  'NOT_FOUND': 'Не найдено', 'SKIPPED': 'Пропущено',
+                  'uploaded': 'Загружено PDF', 'urls_written': 'Записано URL',
+                  'already_confirmed': 'Повторно проверено без загрузки'}
         lines = ['# Итоги ' + profile.upper(), '',
                  'Режим: ' + ('проверка PDF без загрузки' if command == 'preview'
+                              else 'загрузка по подтверждённому плану' if command == 'load'
                               else 'восстановление URL в переданном Excel'), '',
                  '## Статистика', '',
                  *[f'- {labels.get(k, k)}: {v}' for k, v in counts.items()], '',
@@ -108,7 +112,10 @@ def execute_with_reports(worker, command, profile, excel, root_url, results, set
         lines += ['', 'Подробный ход работы: [журнал.txt](журнал.txt).',
                   'Технические данные и checkpoint: [технические-данные.zip]'
                   '(технические-данные.zip).',
-                  'Записи в Sarex и создание папок не выполнялись.', '']
+                  ('Создание папок отключено. Результаты отправок и пропусков — в отчёте.'
+                   if command == 'load' else 'Записи в Sarex и создание папок не выполнялись.'),
+                  ('Запуск остановлен; журнал не сбрасывайте.' if report.get('stopped') else
+                   'План отменён пользователем.' if report.get('cancelled') else ''), '']
         summary.write_text('\n'.join(lines), encoding='utf-8')
         pack_technical(technical, root / 'технические-данные.zip')
     except BaseException:

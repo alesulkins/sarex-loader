@@ -35,14 +35,14 @@ def profile_config(profile, excel, root_url):
 
 def _run_profile(command, profile, excel, root_url, results, settings, *, pdf=None,
                 no_move=False, resume=None):
-    if command not in ('preview', 'fill'):
-        raise ValidationError('Реальная загрузка временно заблокирована; используйте -preview.')
+    if command not in ('preview', 'fill', 'load'):
+        raise ValidationError('Неизвестная команда.')
     if settings.allow_folder_creation:
         raise ValidationError('Создание папок запрещено в этой поставке. Выполните -setup.')
     config = profile_config(profile, excel, root_url)
     results = checked_path(local_path(results), directory=True)
     protected = [config.root]
-    if command == 'preview':
+    if command in ('preview', 'load'):
         pdf = checked_path(local_path(pdf), directory=True)
         protected.append(pdf)
     elif pdf is not None:
@@ -82,13 +82,19 @@ def _run_profile(command, profile, excel, root_url, results, settings, *, pdf=No
         raise ValidationError('Корень не подтверждён сервером; обработка остановлена. '
                               'Диагностика сохранена: ' + str(cache_path))
     output = results / prefix
-    if command == 'preview':
+    if command in ('preview', 'load'):
         from sarex_loader.upload_preview import run_full_preview
 
         print('Проверка PDF верхнего уровня. Только план перемещения; '
               'исходные PDF остаются на месте.')
-        report = run_full_preview(config, {profile: [pdf]}, output, flat=True,
+        preview_output = output if command == 'preview' else results / (prefix + '-preview')
+        report = run_full_preview(config, {profile: [pdf]}, preview_output, flat=True,
                                   move_not_found=False, plan_moves=True, tree_index=index)
+        if command == 'load':
+            from sarex_loader.production_upload import run
+
+            return run(config, index, report, pdf, config.registries[0].excel, output, settings,
+                       no_move=no_move)
         print(f"Проверено PDF: {report['counts']['total_pdf']}. "
               f"Сопоставлено: {report['counts']['matched_excel']}. Загрузка запрещена.")
         for file in report['files']:

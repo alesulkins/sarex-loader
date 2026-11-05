@@ -68,3 +68,7 @@ __pycache__/
 !/ACCEPTANCE.md
 
 !/tests/test_windows_security_regressions.py
+!/tests/test_production_upload.py
+!/tests/test_api_client.py
+!/tests/test_https_transport.py
+!/tests/test_customer_portable.py

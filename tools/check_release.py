@@ -28,7 +28,7 @@ def run(output):
         root = Path(temporary)
         archive = root / 'customer.zip'
         result = build(Path(__file__).resolve().parents[1], archive,
-                       'v0.1.0-rc.5', platform=platform)
+                       'v0.1.0-rc.6', platform=platform)
         with ZipFile(archive) as package:
             if package.testzip() is not None:
                 raise RuntimeError('Corrupt release archive')
@@ -47,9 +47,9 @@ def run(output):
         for profile in ('sk', 'vk'):
             blocked = subprocess.run(  # noqa: S603
                 [str(python), '-m', 'sarex_loader', '-load', profile], cwd=extracted,
-                capture_output=True, timeout=30, check=False)
-            if blocked.returncode != 2:
-                raise RuntimeError('Production load must remain blocked')
+                capture_output=True, input=b'', timeout=30, check=False)
+            if blocked.returncode != 130:
+                raise RuntimeError('Production load must require input and explicit consent')
         if os.name == 'nt':
             # Repeated launch must reuse the installed local Python, not the global launcher.
             launched = execute_logged(output, 'release-bat',
@@ -58,11 +58,11 @@ def run(output):
             if launched.returncode:
                 raise RuntimeError('Native BAT launcher failed; see release-bat-stderr.txt '
                                    'and release-bat-stdout.txt')
-        delivered = output.parent / f'sarex-loader-v0.1.0-rc.5-{platform}.zip'
+        delivered = output.parent / f'sarex-loader-v0.1.0-rc.6-{platform}.zip'
         with delivered.open('xb') as stream, archive.open('rb') as source:
             shutil.copyfileobj(source, stream)
         result = {k: v for k, v in result.items() if k != 'file'}
-        result.update(clean_install=True, cli_help=True, production_load_blocked=True,
+        result.update(clean_install=True, cli_help=True, production_load_requires_consent=True,
                       sarex_requests=0, native_upload_tested=False,
                       native_bat_install_and_repeat=os.name == 'nt')
         with output.open('x', encoding='utf-8') as stream:

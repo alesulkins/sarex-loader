@@ -14,6 +14,7 @@ import sys
 import tempfile
 import threading
 import time
+from contextlib import closing
 from pathlib import Path
 
 from sarex_loader.journal import Journal, fingerprint
@@ -89,8 +90,9 @@ def run_probe():
         successful_path = root / 'другая синтетическая операция'
         def reader():
             try:
-                with sqlite3.connect((successful_path / 'journal.sqlite').as_uri() + '?mode=ro',
-                                     uri=True) as db:
+                with closing(sqlite3.connect(
+                        (successful_path / 'journal.sqlite').as_uri() + '?mode=ro',
+                        uri=True)) as db:
                     db.execute('BEGIN')
                     db.execute('SELECT * FROM operations').fetchall()
                     ready.set()

@@ -43,7 +43,7 @@ BATCH_CONFIRMATION_POLICY = 'create-response-and-get-v1'
 
 
 def batch_document_policy(payload):
-    return (payload.get('mode') == 'batch-test-v2'
+    return (payload.get('mode') in {'batch-test-v2', 'production-upload-v1'}
             and payload.get('confirmation_policy') == BATCH_CONFIRMATION_POLICY)
 
 
@@ -311,6 +311,52 @@ class Journal:
                       'document_id': document, 'url_status': url}
                 for key, state, phase, bundle, document, url in self._db.execute(
                     'SELECT key,state,phase,bundle_id,document_id,url_status FROM operations')}
+
+    def register_production(self, operations):
+        """Append immutable intents ONLY to the new permanent production ledger.
+
+        Old single-test/batch contexts cannot enter this API. No UPDATE/DELETE of
+        existing intents, no changed key to bypass an uncertain inspection.
+        """
+        from sarex_loader.production_scope import (
+            CONTEXT,
+            journal_path,
+            operation_key,
+            validate_item,
+        )
+
+        if self.path != journal_path():
+            raise ValidationError('Нужен постоянный рабочий журнал загрузки.')
+        previous = self._db.execute("SELECT value FROM meta WHERE key='context'").fetchone()
+        if previous not in (None, (fingerprint(CONTEXT),)):
+            raise ValidationError('Исторический журнал нельзя использовать как рабочий.')
+        if any(c['state'] not in {'PLANNED', 'ATTACHED', *BATCH_DOCUMENT_STATES}
+               for c in self.checkpoints().values()):
+            raise ValidationError('OUTCOME_UNKNOWN_OR_INCOMPLETE: нужна сверка журнала; '
+                                  'POST запрещён.')
+        additions = []
+        for key, item in operations.items():
+            validate_item(item)
+            if key != operation_key(item):
+                raise ValidationError('Неверный постоянный ключ инспекции.')
+            encoded = canonical(item)
+            if len(encoded) > 32768:
+                raise ValidationError('Метаданные операции превышают лимит.')
+            stored = self._db.execute(
+                'SELECT payload FROM operations WHERE key=?', (key,)).fetchone()
+            if stored is not None and stored != (encoded,):
+                raise ValidationError('Инспекция уже зарегистрирована с другим PDF '
+                                      'или назначением.')
+            if stored is None:
+                additions.append((key, encoded, 'PLANNED', 'UNVERIFIED'))
+        if previous is None or additions:
+            with self._transaction():
+                if previous is None:
+                    self._db.execute("INSERT INTO meta VALUES ('context', ?)",
+                                     (fingerprint(CONTEXT),))
+                self._db.executemany('INSERT INTO operations VALUES (?,?,?,NULL,NULL,NULL,?)',
+                                     additions)
+        return self.checkpoints()
 
     def operation(self, key: str) -> dict:
         row = self._db.execute('SELECT payload FROM operations WHERE key=?', (key,)).fetchone()

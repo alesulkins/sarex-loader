@@ -29,9 +29,15 @@ class MultipartPDF:
             self.path = within_root(path, root, directory=False)
             if not safe_component(self.path.name) or self.path.suffix.lower() != '.pdf':
                 raise ApiError(ApiErrorCode.INVALID_SOURCE)
-            self._parent = self._stack.enter_context(directory_fd(self.path.parent))
-            fd = os.open(self.path.name, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK,
-                         dir_fd=self._parent)
+            if os.name == 'nt':
+                from sarex_loader.windows_files import _handle, locked_directory
+
+                self._parent = self._stack.enter_context(locked_directory(self.path.parent))
+                fd = _handle(self.path)  # Deny writes/delete; reject reparse/cloud placeholders.
+            else:
+                self._parent = self._stack.enter_context(directory_fd(self.path.parent))
+                fd = os.open(self.path.name, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK,
+                             dir_fd=self._parent)
             self._stream = self._stack.enter_context(os.fdopen(fd, 'rb'))
             info = os.fstat(self._stream.fileno())
             if (not stat.S_ISREG(info.st_mode) or not 0 < info.st_size <= MAX_PDF_BYTES
@@ -74,9 +80,10 @@ class MultipartPDF:
             raise ApiError(ApiErrorCode.INVALID_SOURCE)
 
     def _check_identity(self) -> None:
+        from sarex_loader.file_safety import child_stat
+
         if (identity(os.fstat(self._stream.fileno())) != self._identity
-                or identity(os.stat(self.path.name, dir_fd=self._parent,
-                                    follow_symlinks=False)) != self._identity):
+                or identity(child_stat(self._parent, self.path.name)) != self._identity):
             raise ApiError(ApiErrorCode.INVALID_SOURCE)
 
     def iter_chunks(self) -> Iterator[bytes]:

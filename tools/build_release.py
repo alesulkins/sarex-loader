@@ -63,7 +63,14 @@ def build(root, output, version, *, include_account=False, platform="all"):
     prefix = "sarex-loader-" + version + ("-" + platform if platform != "all" else "")
     with ZipFile(output, "x", compression=ZIP_DEFLATED) as archive:
         for p in paths:
-            archive.write(p, prefix + "/" + p.relative_to(root).as_posix())
+            name = prefix + "/" + p.relative_to(root).as_posix()
+            if p.suffix.lower() == '.bat':
+                # REST-downloaded Git blobs have LF even with eol=crlf attributes.
+                # cmd.exe must receive CRLF in every delivery, including CI-built ZIPs.
+                data = p.read_bytes().replace(b'\r\n', b'\n').replace(b'\n', b'\r\n')
+                archive.writestr(name, data)
+            else:
+                archive.write(p, name)
         archive.writestr(prefix + "/account.toml", account)
     checksum = hashlib.sha256(output.read_bytes()).hexdigest()
     return {
@@ -79,7 +86,7 @@ def build(root, output, version, *, include_account=False, platform="all"):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Создать клиентский ZIP без рабочих данных.")
-    parser.add_argument("--version", default="v0.1.0-rc.5")
+    parser.add_argument("--version", default="v0.1.0-rc.6")
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--platform", choices=("all", "macos", "windows"), default="all")
     parser.add_argument(

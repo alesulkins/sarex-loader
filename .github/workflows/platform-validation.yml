@@ -36,7 +36,9 @@ jobs:
               'src/sarex_loader/browser_extension.js',
               'tests/__init__.py', 'tests/test_windows_native.py', 'tests/windows_journal_probe.py',
               'tests/test_console_encoding.py', 'tests/test_windows_metadata_identity.py',
-              'tests/test_windows_security_regressions.py'
+              'tests/test_windows_security_regressions.py', 'tests/test_production_upload.py',
+              'tests/test_api_client.py', 'tests/test_https_transport.py',
+              'tests/test_customer_portable.py'
             ]);
             const commit = await github.rest.repos.getCommit({...context.repo, ref: context.sha});
             const tree = await github.rest.git.getTree({
@@ -90,6 +92,12 @@ jobs:
       - name: Native Windows guards (no skips allowed on Windows)
         if: ${{ !cancelled() && steps.install.outcome == 'success' && runner.os == 'Windows' }}
         run: python -m pytest -q tests/test_windows_native.py --junitxml=validation-results/windows.xml
+      - name: Full customer upload chains over fake HTTPS only
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: python -m pytest -q tests/test_production_upload.py tests/test_customer_portable.py --junitxml=validation-results/upload.xml
+      - name: Offline upload and duplicate replay
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: python tools/mock_demo.py validation-results/offline-demo
       - name: Save job status even after a failed check
         if: always()
         shell: bash

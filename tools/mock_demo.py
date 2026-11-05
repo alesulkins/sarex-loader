@@ -2,7 +2,6 @@
 
 import argparse
 import json
-import os
 import sys
 from dataclasses import replace
 from datetime import datetime
@@ -24,11 +23,6 @@ def no_network(event, args):
 
 
 def run(root):
-    if os.name == "nt":
-        raise ValidationError(
-            "Полная mock-загрузка ещё требует переноса POSIX-операций. "
-            "На Windows используйте проверку совместимости в GitHub Actions."
-        )
     root = root.absolute()
     checked_path(root.parent, directory=True)
     root.mkdir(mode=0o700)  # Must be NEW; never reset a journal or reuse an unknown operation.
