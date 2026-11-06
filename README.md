@@ -9,8 +9,8 @@
 
 | ОС | Файл в Assets |
 |---|---|
-| Windows | [sarex-loader-v0.1.0-rc.8-windows.zip](https://github.com/alesulkins/sarex-loader/releases/download/v0.1.0-rc.8/sarex-loader-v0.1.0-rc.8-windows.zip) |
-| macOS | [sarex-loader-v0.1.0-rc.8-macos.zip](https://github.com/alesulkins/sarex-loader/releases/download/v0.1.0-rc.8/sarex-loader-v0.1.0-rc.8-macos.zip) |
+| Windows | [sarex-loader-v0.1.0-rc.9-windows.zip](https://github.com/alesulkins/sarex-loader/releases/download/v0.1.0-rc.9/sarex-loader-v0.1.0-rc.9-windows.zip) |
+| macOS | [sarex-loader-v0.1.0-rc.9-macos.zip](https://github.com/alesulkins/sarex-loader/releases/download/v0.1.0-rc.9/sarex-loader-v0.1.0-rc.9-macos.zip) |
 
 Если GitHub показывает 404, войдите в аккаунт, которому предоставлен доступ к закрытому репозиторию. Заказчику без доступа передайте скачанный ZIP напрямую.
 
@@ -49,17 +49,17 @@ python --version
 Можно распаковать командой в другую папку (ничего заменять не нужно: `$env:USERPROFILE` автоматически обозначает вашу папку пользователя):
 
 ```powershell
-Expand-Archive -LiteralPath "$env:USERPROFILE\Downloads\sarex-loader-v0.1.0-rc.8-windows.zip" -DestinationPath "$env:USERPROFILE\Documents\SarexLoader-rc8"
-Set-Location "$env:USERPROFILE\Documents\SarexLoader-rc8\sarex-loader-v0.1.0-rc.8-windows"
+Expand-Archive -LiteralPath "$env:USERPROFILE\Downloads\sarex-loader-v0.1.0-rc.9-windows.zip" -DestinationPath "$env:USERPROFILE\Documents\SarexLoader-rc9"
+Set-Location "$env:USERPROFILE\Documents\SarexLoader-rc9\sarex-loader-v0.1.0-rc.9-windows"
 .\start.bat -help
 ```
 
-При ручной распаковке найдите **папку `sarex-loader-v0.1.0-rc.8-windows`**. Нужна именно эта папка, а не ZIP и не внешняя папка, в которую его распаковали.
+При ручной распаковке найдите **папку `sarex-loader-v0.1.0-rc.9-windows`**. Нужна именно эта папка, а не ZIP и не внешняя папка, в которую его распаковали.
 
-Нажмите **Win+R**, введите `powershell` и нажмите Enter — откроется окно для ввода команд. Введите `cd "полный путь к папке sarex-loader-v0.1.0-rc.8-windows"`, заменив текст в кавычках своим путём. Например, если перенесли папку в «Документы»:
+Нажмите **Win+R**, введите `powershell` и нажмите Enter — откроется окно для ввода команд. Введите `cd "полный путь к папке sarex-loader-v0.1.0-rc.9-windows"`, заменив текст в кавычках своим путём. Например, если перенесли папку в «Документы»:
 
 ```powershell
-cd "$env:USERPROFILE\Documents\sarex-loader-v0.1.0-rc.8-windows"
+cd "$env:USERPROFILE\Documents\sarex-loader-v0.1.0-rc.9-windows"
 .\start.bat -help
 ```
 
@@ -108,9 +108,9 @@ python3 start.py -help
 Либо распакуйте и откройте конкретный архив командами:
 
 ```sh
-mkdir -p "$HOME/Documents/SarexLoader-rc8"
-unzip "$HOME/Downloads/sarex-loader-v0.1.0-rc.8-macos.zip" -d "$HOME/Documents/SarexLoader-rc8"
-cd "$HOME/Documents/SarexLoader-rc8/sarex-loader-v0.1.0-rc.8-macos"
+mkdir -p "$HOME/Documents/SarexLoader-rc9"
+unzip "$HOME/Downloads/sarex-loader-v0.1.0-rc.9-macos.zip" -d "$HOME/Documents/SarexLoader-rc9"
+cd "$HOME/Documents/SarexLoader-rc9/sarex-loader-v0.1.0-rc.9-macos"
 python3 start.py -help
 ```
 
@@ -121,7 +121,7 @@ python3 start.py -help
 
 ## 2. Проверка без учётной записи и без Sarex
 
-Все команды ниже выполняйте **из распакованной папки своей ОС**: `sarex-loader-v0.1.0-rc.8-windows` или `sarex-loader-v0.1.0-rc.8-macos`. Не переносите `start.py`/`start.bat` отдельно.
+Все команды ниже выполняйте **из распакованной папки своей ОС**: `sarex-loader-v0.1.0-rc.9-windows` или `sarex-loader-v0.1.0-rc.9-macos`. Не переносите `start.py`/`start.bat` отдельно.
 
 Сначала `-help`, затем офлайн-тест:
 
@@ -323,7 +323,7 @@ macOS `~/.sarex-loader-production-journal`.
 Минимальная поставка содержит:
 
 ```text
-sarex-loader-v0.1.0-rc.8-<платформа>/
+sarex-loader-v0.1.0-rc.9-<платформа>/
 ├── README.md                  ← эта инструкция
 ├── start.bat                  ← только Windows
 ├── start.command              ← только macOS, дополнительный ярлык
@@ -377,3 +377,5 @@ sarex-loader-v0.1.0-rc.8-<платформа>/
 **Ограничения:** preview и dry-run показывают предполагаемый результат по данным на момент проверки, а не гарантируют будущий результат отправки, так как между проверкой и загрузкой данные, права доступа и структура Sarex могут измениться. Программа не исправляет клиентские данные и не выбирает произвольный вариант при неоднозначности. Неподтверждённые маршруты, конфликты дат, дубликаты и ошибки API приводят к пропуску. Реальное создание папок месяцев в этом выпуске ещё не прошло отдельную проверку на сервере; по умолчанию оно выключено.
 
 После передачи программы заказчик самостоятельно отвечает за проверку исходных данных и отчётов, выбор учётной записи и каталогов, подтверждение загрузки или создания папок, сохранность резервных копий и дальнейшую эксплуатацию. Автор не контролирует действия пользователей после передачи и не принимает на себя ответственность за последствия запуска без предусмотренных проверок, подтверждения неверных назначений, самостоятельного изменения программы или правил, удаления журналов и использования некорректных исходных данных.
+
+Номера инспекций могут повторяться: при нескольких строках с одним номером программа выбирает строку только по точному совпадению календарной даты из имени PDF. Если номер и дата совпадают у нескольких строк, PDF пропускается. Проверки офиса, подрядчика и дубликатов сохраняются.

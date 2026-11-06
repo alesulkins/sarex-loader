@@ -2,6 +2,7 @@
 
 import re
 from collections import Counter, defaultdict
+from datetime import date
 
 from sarex_loader.folder_resolver import FolderRules, collision_key, safe_component
 from sarex_loader.pdf_route_guard import filename_route_checks
@@ -161,6 +162,33 @@ class InspectionIndex:
         return self.groups[group_id]['category'], group_id
 
 
+def pdf_calendar_date(filename):
+    """An exact, valid ISO date prefix; never infer dates from ambiguous names."""
+    match = re.match(r'^(\d{4}-\d{2}-\d{2})(?:-|_)', filename)
+    try:
+        return date.fromisoformat(match[1]).isoformat() if match else None
+    except ValueError:
+        return None
+
+
+def selected_candidates(index, group_id, filename):
+    if group_id is None:
+        return []
+    group = index.groups[group_id]
+    members = group['candidate_ids']
+    day = pdf_calendar_date(filename)
+    if len(members) <= 1 or not day or group.get('unicode_collision'):
+        return members
+    # A row with an unknown date cannot safely be excluded.
+    try:
+        days = [date.fromisoformat(index.candidates[i]['date'][:10]).isoformat()
+                for i in members]
+    except (TypeError, ValueError):
+        return members
+    exact = [i for i, value in zip(members, days, strict=True) if value == day]
+    return exact if len(exact) == 1 else members
+
+
 def build_match_report(index: InspectionIndex, entries, kind: str, separator: str,
                        filename_numbers: dict[str, str] | None = None) -> dict:
     validate_separator(separator)
@@ -181,9 +209,16 @@ def build_match_report(index: InspectionIndex, entries, kind: str, separator: st
                   else extracted)
         reason = entry['reason'] or (None if number is not None else 'SUFFIX_RULE_MISMATCH')
         category, group = ('INVALID_FILENAME', None) if reason else index.lookup(kind, number)
+        members = selected_candidates(index, group, entry['filename'])
+        if (category == 'AMBIGUOUS' and len(members) == 1
+                and len(index.groups[group]['candidate_ids']) > 1):
+            category = ('INVALID_REGISTRY_DATA' if index.candidates[members[0]]['reasons']
+                        else 'MATCHED')
         item = {**entry, 'registry_type': kind, 'number': number, 'category': category,
                 'candidate_group': group, 'duplicate_groups': [],
                 'reasons': [reason] if reason else [], 'proposed_path': None}
+        if group is not None and members is not index.groups[group]['candidate_ids']:
+            item['selected_candidate_ids'] = list(members)
         if entry['filename'] in explicit:
             item['number_evidence'] = 'EXPLICIT_FILENAME_MAPPING'
             item['extracted_number'] = extracted
@@ -201,22 +236,36 @@ def build_match_report(index: InspectionIndex, entries, kind: str, separator: st
             buckets['inode'][tuple(entry['identity'][:2])].append(file_id)
     for basis, groups in buckets.items():
         for members in groups.values():
-            if len(members) < 2:
-                continue
-            group_id = len(duplicates)
-            duplicates.append({'basis': basis, 'file_ids': members})
-            for member in members:
-                item = files[member]
-                item['duplicate_groups'].append(group_id)
-                if item['category'] != 'INVALID_FILENAME':
-                    item['category'] = 'AMBIGUOUS'
-                item['reasons'].append('DUPLICATE_' + basis.upper())
+            if basis == 'number' and all(pdf_calendar_date(files[i]['filename'])
+                                         for i in members):
+                dated = defaultdict(list)
+                for i in members:
+                    dated[pdf_calendar_date(files[i]['filename'])].append(i)
+                # Different days are distinct inspections; identical days still block.
+                members_sets = list(dated.values())
+            else:
+                members_sets = [members]
+            for subset in members_sets:
+                if len(subset) > 1:
+                    duplicates.append({'basis': basis, 'file_ids': subset})
+    for group_id, duplicate in enumerate(duplicates):
+        basis, members = duplicate['basis'], duplicate['file_ids']
+        if len(members) < 2:
+            continue
+        for member in members:
+            item = files[member]
+            item['duplicate_groups'].append(group_id)
+            if item['category'] != 'INVALID_FILENAME':
+                item['category'] = 'AMBIGUOUS'
+            item['reasons'].append('DUPLICATE_' + basis.upper())
     # Finalize only after the whole single pass: a later duplicate blocks earlier files too.
     for item in files:
-        group = (index.groups[item['candidate_group']]
-                 if item['candidate_group'] is not None else None)
+        members = item.get('selected_candidate_ids')
+        if members is None:
+            members = (index.groups[item['candidate_group']]['candidate_ids']
+                       if item['candidate_group'] is not None else [])
         item['filename_route_checks'] = [
-            check for identifier in (group['candidate_ids'] if group else [])
+            check for identifier in members
             for check in filename_route_checks(item['filename'], index.candidates[identifier],
                                                index.candidates[identifier]['routing_root_id'])]
         if item['filename_route_checks']:
@@ -224,8 +273,7 @@ def build_match_report(index: InspectionIndex, entries, kind: str, separator: st
             if item['category'] == 'MATCHED':
                 item['category'] = 'INVALID_REGISTRY_DATA'
         if item['category'] == 'MATCHED':
-            group = index.groups[item['candidate_group']]
-            candidate = index.candidates[group['candidate_ids'][0]]
+            candidate = index.candidates[members[0]]
             folder = candidate['proposed_folder']
             item['proposed_path'] = {**folder,
                                      'components': [*folder['components'], item['filename']]}

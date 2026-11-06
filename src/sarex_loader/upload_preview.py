@@ -19,6 +19,7 @@ from sarex_loader.messages import describe
 from sarex_loader.monthly_folders import filename_date_check, infer_month_name
 from sarex_loader.pdf_route_guard import destination_check
 from sarex_loader.pdf_scan import MAX_ENTRIES, identity, scan_pdfs
+from sarex_loader.preview_messages import explain_file
 from sarex_loader.reports import _write_bundle, literal
 from sarex_loader.safety import ValidationError
 from sarex_loader.tree_acceptance import operational_tree
@@ -80,13 +81,23 @@ def route_details(index, root, parts, confirmed_missing):
                 'need_folder': False, 'naming': None}
     result = {'folder_status': resolution.status, 'folder_id': None, 'parent_id': None,
               'full_path': full_path(index, root) + ' → ' + ' → '.join(
-                  p[9:-1] if p.startswith('{company:') else p for p in parts),
+                  p[9:-1] if p.startswith('{company:') else
+                  p[7:-1] if p.startswith('{month:') else p for p in parts),
               'need_folder': False, 'naming': None}
     if (resolution.status != 'FOLDER_NOT_RESOLVED_IN_SNAPSHOT' or not parts
             or not parts[-1].startswith('{month:') or not parts[-1].endswith('}')):
         return result
     parent = resolve_observed_path(index, root, parts[:-1])
     if parent.folder_id is None:
+        for position, part in enumerate(parts[:-1]):
+            prefix = resolve_observed_path(index, root, parts[:position + 1])
+            if prefix.folder_id is None:
+                if prefix.status == 'FOLDER_NOT_RESOLVED_IN_SNAPSHOT' and operational_tree(index):
+                    result['missing_component'] = (
+                        part[9:-1] if part.startswith('{company:') else part)
+                    result['missing_level'] = ('папка подрядчика' if part.startswith('{company:')
+                                               else 'папка раздела')
+                break
         return result
     month = parts[-1][7:-1]
     naming = infer_month_name(list(index.children[parent.folder_id].values()), month,
@@ -131,7 +142,8 @@ def run_full_preview(config, pdf_roots, output, *, confirmed_missing=(), flat=Fa
     paths = set()
     for file in files:
         group = file['candidate_group']
-        members = inspections.groups[group]['candidate_ids'] if group is not None else []
+        members = file.get('selected_candidate_ids',
+                           inspections.groups[group]['candidate_ids'] if group is not None else [])
         file['excel_candidates'] = [inspections.candidates[i] for i in members]
         for candidate in file['excel_candidates']:
             proposal = candidate['proposed_folder']
@@ -221,17 +233,7 @@ def run_full_preview(config, pdf_roots, output, *, confirmed_missing=(), flat=Fa
             file['reasons'].append(file['naming']['status'])
         file['reasons'] = list(dict.fromkeys(file['reasons']))
         file['status_description'] = describe(file['status'])
-        file['reason_description'] = '; '.join(dict.fromkeys(
-            describe(c) for c in [file['status'], *file['reasons']] if c))
-        if file.get('filename_route_checks'):
-            file['reason_description'] += '; ' + '; '.join(dict.fromkeys(
-                f"Строка Excel {c.get('row')}: офис {c.get('excel_office')}, "
-                f"подрядчик {c.get('excel_contractor')}; в имени PDF: "
-                + ', '.join(c.get('filename_contractors', [])
-                            + c.get('filename_offices', []) + c.get('filename_scopes', []))
-                for c in file['filename_route_checks'] if 'excel_contractor' in c))
-        if file.get('naming') and file['naming']['status'] != 'MONTH_NAME_INFERRED':
-            file['reason_description'] += '; ' + describe(file['naming']['status'])
+        file['reason_description'] = explain_file(file)
         if file['parent_id']:
             key = file['parent_id'], file['month']
             if key not in planned_folders:

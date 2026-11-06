@@ -151,7 +151,8 @@ def build_plan(config, journal: Journal | None = None, *, read_tree=False,
         candidate = None
         members = []
         if file['candidate_group'] is not None:
-            members = index.groups[file['candidate_group']]['candidate_ids']
+            members = file.get('selected_candidate_ids',
+                               index.groups[file['candidate_group']]['candidate_ids'])
             if len(members) == 1:
                 candidate = index.candidates[members[0]]
             if candidate and candidate['existing_url'] and category == 'MATCHED':

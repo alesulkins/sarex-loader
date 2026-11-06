@@ -96,10 +96,8 @@ def _run_profile(command, profile, excel, root_url, results, settings, *, pdf=No
         print(f"Проверено PDF: {report['counts']['total_pdf']}. "
               f"Сопоставлено: {report['counts']['matched_excel']}. Загрузка запрещена.")
         for file in report['files']:
-            if file['excel_candidates'] and not file['folder_id']:
-                print(f"Для файла {file['filename']} не найдена папка назначения: "
-                      f"{file['full_path'] or 'маршрут не определён'}. "
-                      'Необходимо создать папку или проверить исходные данные.')
+            if file['status'] != 'READY_BY_METADATA':
+                print(f"Файл {file['filename']}: {file['reason_description']}")
     else:
         from sarex_loader.recovery import run_recovery
 

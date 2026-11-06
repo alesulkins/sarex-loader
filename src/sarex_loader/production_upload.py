@@ -22,6 +22,7 @@ from sarex_loader.local_moves import execute_moves
 from sarex_loader.matching import extract_number
 from sarex_loader.messages import describe
 from sarex_loader.pdf_scan import scan_pdfs
+from sarex_loader.preview_messages import explain_file
 from sarex_loader.production_scope import ProductionScope, journal_path, operation_key
 from sarex_loader.profile_auth import use_settings
 from sarex_loader.reports import _write_bundle
@@ -65,7 +66,7 @@ def _reason(file, reason):
     file["reasons"] = list(dict.fromkeys([*file["reasons"], reason]))
     file["status"] = "UPLOAD_SKIPPED"
     file["status_description"] = "Пропущен"
-    file["reason_description"] = "; ".join(describe(r) for r in file["reasons"])
+    file["reason_description"] = explain_file(file) if file["reasons"] else ""
 
 
 def prepare_operations(config, index, report, pdf, journal):
@@ -346,7 +347,7 @@ def run(config, index, report, pdf, excel, output, settings, *, no_move=False, a
                                                verify_sources=verify_folder_sources, ask=ask)
             result['stopped'] = any(p['status'] == 'OUTCOME_UNKNOWN' for p in result['folders'])
     for file in report["files"]:
-        file["reason_description"] = "; ".join(describe(r) for r in file["reasons"])
+        file["reason_description"] = explain_file(file) if file["reasons"] else ""
     report.update(
         result,
         mode="PRODUCTION_UPLOAD",

@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "sarex-loader"
-version = "0.1.0rc8"
+version = "0.1.0rc9"
 description = "Sarex inspection PDF routing and Excel URL recovery"
 readme = {text = "Sarex Loader. Run start.bat on Windows or start.command on macOS. Python 3.11+ is required. Upload requires explicit plan approval. Month creation is disabled by default and requires separate consent.", content-type = "text/plain"}
 requires-python = ">=3.11"

@@ -237,3 +237,32 @@ def test_changed_intent_cannot_use_new_key(sample, https_mock):
     assert result["uploaded"] == 0 and not post_count(https_mock)
     with Journal(scope.journal_path(), [pdf.parent]) as journal:
         assert len(journal.checkpoints()) == 1
+
+
+def test_repeated_number_different_dates_uses_correct_excel_row(sample):
+    _, preview, _, _, _, excel, _ = sample
+    book = load_workbook(excel)
+    book.active.append([2, datetime(2026, 9, 22), 'Другой офис', 'Другой подрядчик', '123', None])
+    book.save(excel)
+    book.close()
+    report = preview('повтор-номера-разные-даты')
+    file = report['files'][0]
+    assert file['category'] == 'MATCHED'
+    assert file['row'] == 2
+    assert file['folder_id'] == 503
+    assert file['ready_by_metadata']
+    assert not file['candidate_date_checks']
+    assert not file['filename_route_checks']
+
+
+def test_repeated_number_same_day_different_time_stays_blocked(sample):
+    _, preview, _, _, _, excel, _ = sample
+    book = load_workbook(excel)
+    book.active.append([2, datetime(2026, 10, 5, 19),
+                        'Другой офис', 'Другой подрядчик', '123', None])
+    book.save(excel)
+    book.close()
+    file = preview('повтор-номера-одинаковый-день')['files'][0]
+    assert file['category'] == 'AMBIGUOUS'
+    assert file['folder_id'] is None
+    assert not file['ready_by_metadata']
