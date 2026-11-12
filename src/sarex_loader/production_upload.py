@@ -227,13 +227,18 @@ def run(config, index, report, pdf, excel, output, settings, *, no_move=False, a
                     raise ValidationError("Excel открыт, изменён или недоступен для записи.")
 
             verify()
-            # Validate workbook structure and each destination cell before any resource POST.
-            make_url_copy(
-                snapshot,
-                hashlib.sha256(snapshot).hexdigest(),
-                [_update(f["excel_candidates"][0], 1) for f in selected.values()],
-                approved_document_ids=(1,),
-            )
+            # Validate ALL destination cells before any resource POST. This throwaway
+            # in-memory copy uses the existing isolated synthetic URL contract: document
+            # IDs do not exist yet and must not be presented as server-approved IDs.
+            validation_updates = []
+            for position, file in enumerate(selected.values(), 1):
+                candidate = file["excel_candidates"][0]
+                validation_updates.append(URLUpdate(
+                    candidate["sheet"], candidate["row"], candidate["id"], candidate["number"],
+                    f"https://upload.example.invalid/documentations/{position}",
+                ))
+            if validation_updates:
+                make_url_copy(snapshot, hashlib.sha256(snapshot).hexdigest(), validation_updates)
             journal.register_production(operations)
             scope = ProductionScope(
                 config.tree.root_ids[0],

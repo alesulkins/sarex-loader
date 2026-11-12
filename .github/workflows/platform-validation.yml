@@ -39,6 +39,7 @@ jobs:
               'tests/test_windows_security_regressions.py', 'tests/test_production_upload.py',
               'tests/test_api_client.py', 'tests/test_https_transport.py',
               'tests/test_customer_portable.py', 'tests/test_delivery_manifest.py',
+              'tests/test_production_batch.py',
               'tests/test_folder_toggle.py', 'tests/test_preview_diagnostics.py'
             ]);
             const commit = await github.rest.repos.getCommit({...context.repo, ref: context.sha});
@@ -102,6 +103,9 @@ jobs:
       - name: Full customer upload chains over fake HTTPS only
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         run: python -m pytest -q tests/test_production_upload.py tests/test_customer_portable.py tests/test_preview_diagnostics.py --junitxml=validation-results/upload.xml
+      - name: Multi-PDF upload, replay, interruption and Excel recovery (mock HTTPS)
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: python -m pytest -q tests/test_production_batch.py --junitxml=validation-results/batch.xml
       - name: Offline upload and duplicate replay
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         run: python tools/mock_demo.py validation-results/offline-demo
@@ -147,6 +151,11 @@ jobs:
               if data['sarex_requests'] != 0 or data['checks']['replay_effects'] != 0:
                   raise SystemExit('SQLite safety check failed')
           import xml.etree.ElementTree as ET
+          for os_name in ('windows-latest', 'macos-latest'):
+              batch = ET.parse(root / f'validation-{os_name}/batch.xml')
+              if (len(batch.findall('.//testcase')) < 14 or batch.findall('.//skipped')
+                      or batch.findall('.//failure') or batch.findall('.//error')):
+                  raise SystemExit('Multi-PDF regression suite incomplete or failed')
           report = ET.parse(root / 'validation-windows-latest/windows.xml')
           if report.findall('.//skipped'):
               raise SystemExit('Windows tests must not be skipped')

@@ -9,8 +9,8 @@
 
 | ОС | Файл в Assets |
 |---|---|
-| Windows | [sarex-loader-v0.1.0-rc.9-windows.zip](https://github.com/alesulkins/sarex-loader/releases/download/v0.1.0-rc.9/sarex-loader-v0.1.0-rc.9-windows.zip) |
-| macOS | [sarex-loader-v0.1.0-rc.9-macos.zip](https://github.com/alesulkins/sarex-loader/releases/download/v0.1.0-rc.9/sarex-loader-v0.1.0-rc.9-macos.zip) |
+| Windows | [sarex-loader-v0.1.0-rc.10-windows.zip](https://github.com/alesulkins/sarex-loader/releases/download/v0.1.0-rc.10/sarex-loader-v0.1.0-rc.10-windows.zip) |
+| macOS | [sarex-loader-v0.1.0-rc.10-macos.zip](https://github.com/alesulkins/sarex-loader/releases/download/v0.1.0-rc.10/sarex-loader-v0.1.0-rc.10-macos.zip) |
 
 Выберите раздел **своей ОС** для установки ниже. 
 После установки порядок действий одинаков на всех ОС.
@@ -40,25 +40,25 @@ python --version
 
 ## 1.2. Sarex loader&fill
 
-1. Скачайте [Windows ZIP](https://github.com/alesulkins/sarex-loader/releases/download/v0.1.0-rc.9/sarex-loader-v0.1.0-rc.9-windows.zip) в «Загрузки».
+1. Скачайте [Windows ZIP](https://github.com/alesulkins/sarex-loader/releases/download/v0.1.0-rc.10/sarex-loader-v0.1.0-rc.10-windows.zip) в «Загрузки».
 2. Нажмите правой кнопкой → **Извлечь всё**.
 3. Перенесите распакованную папку в «Документы», например в `Documents\SarexLoader`.
 
 Можно распаковать командой в другую папку (ничего заменять не нужно: `$env:USERPROFILE` автоматически обозначает вашу папку пользователя):
 
 ```powershell
-Expand-Archive -LiteralPath "$env:USERPROFILE\Downloads\sarex-loader-v0.1.0-rc.9-windows.zip" -DestinationPath "$env:USERPROFILE\Documents\SarexLoader-rc9"
-Set-Location "$env:USERPROFILE\Documents\SarexLoader-rc9\sarex-loader-v0.1.0-rc.9-windows"
+Expand-Archive -LiteralPath "$env:USERPROFILE\Downloads\sarex-loader-v0.1.0-rc.10-windows.zip" -DestinationPath "$env:USERPROFILE\Documents\SarexLoader-rc10"
+Set-Location "$env:USERPROFILE\Documents\SarexLoader-rc10\sarex-loader-v0.1.0-rc.10-windows"
 .\start.bat -help
 ```
 
-При ручной распаковке найдите **папку `sarex-loader-v0.1.0-rc.9-windows`**. 
+При ручной распаковке найдите **папку `sarex-loader-v0.1.0-rc.10-windows`**.
 Нужна именно эта папка, а не ZIP и не внешняя папка, в которую его распаковали.
 
-Нажмите **Win+R**, введите `powershell` и нажмите Enter — откроется окно для ввода команд. Введите `cd "полный путь к папке sarex-loader-v0.1.0-rc.9-windows"`, заменив текст в кавычках своим путём. Например, если перенесли папку в «Документы»:
+Нажмите **Win+R**, введите `powershell` и нажмите Enter — откроется окно для ввода команд. Введите `cd "полный путь к папке sarex-loader-v0.1.0-rc.10-windows"`, заменив текст в кавычках своим путём. Например, если перенесли папку в «Документы»:
 
 ```powershell
-cd "$env:USERPROFILE\Documents\sarex-loader-v0.1.0-rc.9-windows"
+cd "$env:USERPROFILE\Documents\sarex-loader-v0.1.0-rc.10-windows"
 .\start.bat -help
 ```
 
@@ -108,9 +108,9 @@ python3 start.py -help
 Либо распакуйте и откройте конкретный архив командами:
 
 ```sh
-mkdir -p "$HOME/Documents/SarexLoader-rc9"
-unzip "$HOME/Downloads/sarex-loader-v0.1.0-rc.9-macos.zip" -d "$HOME/Documents/SarexLoader-rc9"
-cd "$HOME/Documents/SarexLoader-rc9/sarex-loader-v0.1.0-rc.9-macos"
+mkdir -p "$HOME/Documents/SarexLoader-rc10"
+unzip "$HOME/Downloads/sarex-loader-v0.1.0-rc.10-macos.zip" -d "$HOME/Documents/SarexLoader-rc10"
+cd "$HOME/Documents/SarexLoader-rc10/sarex-loader-v0.1.0-rc.10-macos"
 python3 start.py -help
 ```
 
@@ -171,7 +171,7 @@ python3 start.py -help
 
 ## 2. Проверка без учётной записи и без Sarex
 
-Все команды ниже выполняйте **из распакованной папки своей ОС**: `sarex-loader-v0.1.0-rc.9-windows`.
+Все команды ниже выполняйте **из распакованной папки своей ОС**: `sarex-loader-v0.1.0-rc.10-windows`.
 
 Сначала `-help`, затем офлайн-тест:
 
@@ -374,7 +374,7 @@ Windows `%USERPROFILE%\.sarex-loader-production-journal`,
 Минимальная поставка содержит:
 
 ```text
-sarex-loader-v0.1.0-rc.9- <платформа>/
+sarex-loader-v0.1.0-rc.10- <платформа>/
 ├── README.md ← эта инструкция
 ├── start.bat                           ← только Windows
 ├── start.command                ← только macOS, дополнительный ярлык

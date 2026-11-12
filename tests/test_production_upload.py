@@ -7,6 +7,7 @@ from datetime import datetime
 import pytest
 from openpyxl import Workbook, load_workbook
 
+from sarex_loader import folder_ledger
 from sarex_loader import production_scope as scope
 from sarex_loader import production_upload as flow
 from sarex_loader.api_transport import BearerToken
@@ -93,6 +94,7 @@ def sample(tmp_path, monkeypatch, request):
     )
     monkeypatch.setattr(scope, "journal_path", lambda: tmp_path / "постоянный журнал")
     monkeypatch.setattr(flow, "journal_path", scope.journal_path)
+    monkeypatch.setattr(folder_ledger, "journal_path", lambda: tmp_path / "журнал папок")
 
     @contextmanager
     def login():
