@@ -322,6 +322,7 @@ class Journal:
             CONTEXT,
             journal_path,
             operation_key,
+            stored_identity_keys,
             validate_item,
         )
 
@@ -335,9 +336,13 @@ class Journal:
             raise ValidationError('OUTCOME_UNKNOWN_OR_INCOMPLETE: нужна сверка журнала; '
                                   'POST запрещён.')
         additions = []
+        stored_operations = {key: json.loads(payload) for key, payload in self._db.execute(
+            'SELECT key,payload FROM operations')}
+        identities = stored_identity_keys(stored_operations)
         for key, item in operations.items():
             validate_item(item)
-            if key != operation_key(item):
+            identity = operation_key(item)
+            if key != identities.get(identity, identity):
                 raise ValidationError('Неверный постоянный ключ инспекции.')
             encoded = canonical(item)
             if len(encoded) > 32768:
@@ -349,6 +354,7 @@ class Journal:
                                       'или назначением.')
             if stored is None:
                 additions.append((key, encoded, 'PLANNED', 'UNVERIFIED'))
+            identities[identity] = key
         if previous is None or additions:
             with self._transaction():
                 if previous is None:

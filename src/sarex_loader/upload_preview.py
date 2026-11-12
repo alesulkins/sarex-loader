@@ -14,7 +14,12 @@ from sarex_loader.confirmed_absences import CONFIRMED_MISSING_MONTHS
 from sarex_loader.file_safety import read_snapshot
 from sarex_loader.folder_resolver import collision_key
 from sarex_loader.journal import fingerprint
-from sarex_loader.matching import InspectionIndex, build_match_report, extract_number
+from sarex_loader.matching import (
+    InspectionIndex,
+    build_match_report,
+    extract_number,
+    pdf_dates_may_match,
+)
 from sarex_loader.messages import describe
 from sarex_loader.monthly_folders import filename_date_check, infer_month_name
 from sarex_loader.pdf_route_guard import destination_check
@@ -197,9 +202,11 @@ def run_full_preview(config, pdf_roots, output, *, confirmed_missing=(), flat=Fa
             if file['folder_id']:
                 file['remote_document_ids'] = sorted(set(
                     remote_names.get((file['folder_id'], collision_key(file['filename'])), [])
-                    + remote_numbers.get((file['folder_id'], collision_key(file['number'])), [])
-                    + remote_numbers.get((file['folder_id'], collision_key(
-                        file.get('extracted_number') or file['number'])), [])))
+                    + [identifier for number in {file['number'],
+                                                 file.get('extracted_number') or file['number']}
+                       for identifier in remote_numbers.get(
+                           (file['folder_id'], collision_key(number)), [])
+                       if pdf_dates_may_match(file['filename'], index.documents[identifier].name)]))
         if candidate:
             file['reasons'] = list(dict.fromkeys([*file['reasons'], *candidate['reasons']]))
         if file['category'] == 'MATCHED' and not invalid_pdf_date:

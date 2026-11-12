@@ -19,11 +19,16 @@ from sarex_loader.gateway_tree import gateway_login
 from sarex_loader.gateway_tree_policy import GatewayTreeReadPolicy
 from sarex_loader.journal import BATCH_CONFIRMATION_POLICY, Journal, fingerprint
 from sarex_loader.local_moves import execute_moves
-from sarex_loader.matching import extract_number
+from sarex_loader.matching import extract_number, pdf_dates_may_match
 from sarex_loader.messages import describe
 from sarex_loader.pdf_scan import scan_pdfs
 from sarex_loader.preview_messages import explain_file
-from sarex_loader.production_scope import ProductionScope, journal_path, operation_key
+from sarex_loader.production_scope import (
+    ProductionScope,
+    journal_path,
+    operation_key,
+    stored_identity_keys,
+)
 from sarex_loader.profile_auth import use_settings
 from sarex_loader.reports import _write_bundle
 from sarex_loader.safety import ValidationError
@@ -74,7 +79,9 @@ def prepare_operations(config, index, report, pdf, journal):
     contents = {f["filename"]: f for f in scan_pdfs(pdf)}
     hashes = Counter(f["sha256"] for f in contents.values() if f["sha256"])
     checkpoints = journal.checkpoints()
+    existing_keys = stored_identity_keys({k: journal.operation(k) for k in checkpoints})
     operations, selected = {}, {}
+    conflicting_keys = set()
     for file in report["files"]:
         content = contents.get(file["filename"])
         if not content or content["reason"] or content["identity"] != file["identity"]:
@@ -107,7 +114,15 @@ def prepare_operations(config, index, report, pdf, journal):
             "file_key": "pdf",
             "bundle_date": candidate["date"][:10] + "T12:00:00+03:00",
         }
-        key = operation_key(item)
+        identity = operation_key(item)
+        key = existing_keys.get(identity, identity)
+        if key in operations or key in conflicting_keys:
+            if key in operations:
+                _reason(selected.pop(key), "Неоднозначная инспекция в плане загрузки.")
+                del operations[key]
+            conflicting_keys.add(key)
+            _reason(file, "Неоднозначная инспекция в плане загрузки.")
+            continue
         previous = checkpoints.get(key)
         if previous and journal.operation(key) != item:
             _reason(file, "Инспекция уже зарегистрирована с другим PDF или назначением.")
@@ -288,8 +303,9 @@ def run(config, index, report, pdf, excel, output, settings, *, no_move=False, a
                             and not d.is_folder
                             and (
                                 collision_key(d.name) == collision_key(item["filename"])
-                                or extract_number(d.name, config.separator)
-                                in {item["number"], file.get("extracted_number")}
+                                or (extract_number(d.name, config.separator)
+                                    in {item["number"], file.get("extracted_number")}
+                                    and pdf_dates_may_match(d.name, item["filename"]))
                             )
                             for d in children[folder].values()
                         ):
@@ -316,8 +332,14 @@ def run(config, index, report, pdf, excel, output, settings, *, no_move=False, a
                     for field in ("uploaded", "already_confirmed"):
                         result[field] += sent[field]
                     result["errors"].extend(sent["errors"])
+                    if key in sent['urls']:
+                        file['remote_document_ids'] = [sent['urls'][key]]
                     if sent["errors"]:
                         _reason(file, "; ".join(describe(e["code"]) for e in sent["errors"]))
+                        if key in sent['urls']:
+                            file.update(
+                                status='UPLOADED_URL_SAVE_FAILED',
+                                status_description='PDF подтверждён; запись URL не подтверждена')
                     else:
                         file.update(
                             status="UPLOADED_AND_SAVED",
@@ -363,7 +385,16 @@ def run(config, index, report, pdf, excel, output, settings, *, no_move=False, a
         local_moves_enabled=bool(result["moves"]),
         folder_creation_enabled=settings.allow_folder_creation,
         local_moves_audit_directory=str(output.parent / (output.name + "-moves")),
+        preview_plan_sha256=report['plan_sha256'],
+        plan_sha256=plan['sha256'],
+        summary=dict(Counter(f['status'] for f in report['files'])),
     )
+    # Content/API/save failures occur after preview; do not publish its stale zero.
+    report['counts']['problem_files'] = sum(
+        f['category'] != 'MATCHED' or bool(f['date_conflict'])
+        or f['status'] in {'UPLOAD_SKIPPED', 'UPLOADED_URL_SAVE_FAILED'}
+        for f in report['files'])
+    report['counts'].pop('ready_to_upload', None)
     report["counts"].update(
         uploaded=result["uploaded"],
         urls_written=result["urls_written"],

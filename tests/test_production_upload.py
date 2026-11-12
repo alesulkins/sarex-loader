@@ -125,6 +125,7 @@ def sample(tmp_path, monkeypatch, request):
             ask=lambda _: answer,
         )
 
+    preview.config = config
     payload = {
         "id": 9000001,
         "name": name,

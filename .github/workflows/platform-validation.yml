@@ -11,7 +11,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [windows-latest, macos-latest]
+        os: [windows-latest, macos-15-intel]
     runs-on: ${{ matrix.os }}
     timeout-minutes: 20
     steps:
@@ -103,7 +103,7 @@ jobs:
       - name: Full customer upload chains over fake HTTPS only
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         run: python -m pytest -q tests/test_production_upload.py tests/test_customer_portable.py tests/test_preview_diagnostics.py --junitxml=validation-results/upload.xml
-      - name: Multi-PDF upload, replay, interruption and Excel recovery (mock HTTPS)
+      - name: Multi-PDF upload, dated numbers, legacy journals and Excel recovery (mock HTTPS)
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         run: python -m pytest -q tests/test_production_batch.py --junitxml=validation-results/batch.xml
       - name: Offline upload and duplicate replay
@@ -141,19 +141,19 @@ jobs:
           from pathlib import Path
           root = Path('results')
           win = json.loads((root / 'validation-windows-latest/platform.json').read_text())
-          mac = json.loads((root / 'validation-macos-latest/platform.json').read_text())
+          mac = json.loads((root / 'validation-macos-15-intel/platform.json').read_text())
           if win['platform'] != 'Windows' or mac['platform'] != 'Darwin':
               raise SystemExit('Unexpected operating systems')
           if win['canonical'] != mac['canonical']:
               raise SystemExit('Windows/macOS behavior differs; inspect artifacts')
-          for os_name in ('windows-latest', 'macos-latest'):
+          for os_name in ('windows-latest', 'macos-15-intel'):
               data = json.loads((root / f'validation-{os_name}/journal.json').read_text(encoding='utf-8-sig'))
               if data['sarex_requests'] != 0 or data['checks']['replay_effects'] != 0:
                   raise SystemExit('SQLite safety check failed')
           import xml.etree.ElementTree as ET
-          for os_name in ('windows-latest', 'macos-latest'):
+          for os_name in ('windows-latest', 'macos-15-intel'):
               batch = ET.parse(root / f'validation-{os_name}/batch.xml')
-              if (len(batch.findall('.//testcase')) < 14 or batch.findall('.//skipped')
+              if (len(batch.findall('.//testcase')) < 38 or batch.findall('.//skipped')
                       or batch.findall('.//failure') or batch.findall('.//error')):
                   raise SystemExit('Multi-PDF regression suite incomplete or failed')
           report = ET.parse(root / 'validation-windows-latest/windows.xml')

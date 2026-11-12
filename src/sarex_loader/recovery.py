@@ -4,6 +4,7 @@ import hashlib
 import json
 from collections import Counter, defaultdict
 from dataclasses import replace
+from datetime import date
 
 from sarex_loader.api_models import ApiError, decode_payload
 from sarex_loader.audit import audit_registry
@@ -11,7 +12,7 @@ from sarex_loader.excel_copy import URLUpdate, make_url_copy
 from sarex_loader.file_safety import read_snapshot
 from sarex_loader.folder_resolver import collision_key
 from sarex_loader.gateway_models import MAX_GATEWAY_NODES, parse_gateway_search_documents
-from sarex_loader.matching import extract_number
+from sarex_loader.matching import extract_number, pdf_calendar_date
 from sarex_loader.monthly_folders import filename_date_check
 from sarex_loader.pdf_route_guard import VERSION as PDF_ROUTE_VERSION
 from sarex_loader.pdf_route_guard import destination_check, filename_route_checks
@@ -26,6 +27,13 @@ NUMBER_DUPLICATES = {'DUPLICATE_NUMBER', 'DUPLICATE_FOLDER_NUMBER',
 
 def _digest(data):
     return hashlib.sha256(data).hexdigest()
+
+
+def _record_day(record):
+    try:
+        return date.fromisoformat(record['date'][:10]).isoformat()
+    except (KeyError, TypeError, ValueError):
+        return None
 
 
 def _pagination(envelope, count):
@@ -190,6 +198,17 @@ def run_recovery(config, *, output_dir=None, write_copy=False, expected_plan_sha
     destination_numbers = Counter((i['folder'], collision_key(i['record']['number']))
                                   for i in entries if i['folder'] is not None
                                   and isinstance(i['record']['number'], str))
+    context_days = Counter((i['context'], i['record']['number'], _record_day(i['record']))
+                           for i in entries if isinstance(i['record']['number'], str))
+    destination_days = Counter((i['folder'], collision_key(i['record']['number']),
+                                _record_day(i['record'])) for i in entries
+                               if i['folder'] is not None
+                               and isinstance(i['record']['number'], str))
+    pdf_days = defaultdict(list)
+    for (folder, number), identifiers in pdfs.items():
+        for identifier in identifiers:
+            day = pdf_calendar_date(documents[identifier].name)
+            pdf_days[folder, number, day].append(identifier)
     # Audit retains only URL hashes. A PDF already assigned anywhere in these registries
     # cannot also be used to fill a different row, even if that row has a different number.
     existing_urls = {r['url_hash'] for registry in registries for r in registry['records']
@@ -213,8 +232,25 @@ def run_recovery(config, *, output_dir=None, write_copy=False, expected_plan_sha
         empty += is_empty
         covered_empty += is_empty and folder in covered
         row_checks = []
-        if isinstance(number, str) and folder in covered and len(pdfs[(folder, number)]) == 1:
-            document = documents[pdfs[(folder, number)][0]]
+        day = _record_day(record)
+        destination_key = (folder, collision_key(number)) if isinstance(number, str) else (None, '')
+        context_count = len(rows[(*context, number)]) if isinstance(number, str) else 0
+        all_ids = pdfs[(folder, number)] if isinstance(number, str) else []
+        date_required = (context_count > 1 or destination_numbers[destination_key] > 1
+                         or len(all_ids) > 1)
+        matches = all_ids
+        if date_required:
+            # Only a valid, exact day can distinguish repeated numbers. An undated
+            # candidate remains potentially conflicting and cannot be discarded.
+            matches = (pdf_days[folder, number, day]
+                       if day and not pdf_days[folder, number, None] else [])
+        context_unique = (context_count == 1 or day and not context_days[context, number, None]
+                          and context_days[context, number, day] == 1)
+        destination_unique = (destination_numbers[destination_key] <= 1 or day
+                              and not destination_days[*destination_key, None]
+                              and destination_days[*destination_key, day] == 1)
+        if isinstance(number, str) and folder in covered and len(matches) == 1:
+            document = documents[matches[0]]
             rules = (config.routes or {}).get(context[0])
             if rules:
                 row_checks = filename_route_checks(document.name, record, rules.root_id)
@@ -226,20 +262,20 @@ def run_recovery(config, *, output_dir=None, write_copy=False, expected_plan_sha
             status = 'EXISTING_URL'
         elif item['invalid']:
             status = 'INVALID_DATA'
-        elif (len(rows[(*context, number)]) != 1
+        elif (not context_unique
               or len(row_normalized[(*context, collision_key(number))]) != 1
-              or destination_numbers[(folder, collision_key(number))] > 1):
+              or not destination_unique):
             status = 'AMBIGUOUS'
         elif folder_problems.get(context) in {'AMBIGUOUS_FOLDER', 'AMBIGUOUS_ROUTE'}:
             status = 'AMBIGUOUS'
         elif folder not in covered:
             status = 'NOT_COVERED_BY_EXPORT'
-        elif (len(pdfs[(folder, number)]) > 1
+        elif (len(matches) > 1 or date_required and all_ids and len(matches) != 1
               or len(pdf_normalized[(folder, collision_key(number))]) > 1):
             status = 'AMBIGUOUS'
-        elif not pdfs[(folder, number)]:
+        elif not matches:
             status = 'NOT_FOUND_IN_EXPORT'
-        elif pdfs[(folder, number)][0] in already_assigned:
+        elif matches[0] in already_assigned:
             status = 'AMBIGUOUS'
         elif row_checks:
             status = 'INVALID_DATA'
@@ -248,12 +284,12 @@ def run_recovery(config, *, output_dir=None, write_copy=False, expected_plan_sha
                 tree_info['operational_acceptance']['accepted_for_operational_checks']):
             status = 'NOT_COVERED_BY_EXPORT'
             observed_candidates.append({'registry_type': context[0], 'row': record['row'],
-                'folder_id': folder, 'document_id': pdfs[(folder, number)][0],
+                'folder_id': folder, 'document_id': matches[0],
                 'reason': 'TREE_COMPLETENESS_UNVERIFIED'})
             row_problem = 'TREE_COMPLETENESS_UNVERIFIED'
         else:
             status = 'MATCHED'
-            identifier = pdfs[(folder, number)][0]
+            identifier = matches[0]
             ids[item['source']].append(identifier)
             updates[item['source']].append(URLUpdate(
                 record['sheet'], record['row'], record['id_key'], number,

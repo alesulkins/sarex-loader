@@ -171,6 +171,12 @@ def pdf_calendar_date(filename):
         return None
 
 
+def pdf_dates_may_match(first, second):
+    """An unknown/invalid date cannot exclude a potential remote duplicate."""
+    left, right = pdf_calendar_date(first), pdf_calendar_date(second)
+    return left is None or right is None or left == right
+
+
 def selected_candidates(index, group_id, filename):
     if group_id is None:
         return []

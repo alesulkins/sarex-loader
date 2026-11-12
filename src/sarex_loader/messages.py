@@ -5,6 +5,10 @@ import re
 import sys
 
 LABELS = {
+    "UPLOADED_URL_SAVE_FAILED": (
+        "PDF подтверждён в Sarex, но сохранение URL в Excel не подтверждено. "
+        "Сохраните журнал: повтор должен восстановить ссылку без новой загрузки"
+    ),
     "PDF_CONTRACTOR_MISMATCH": "Подрядчик в имени PDF противоречит подрядчику Excel; файл пропущен",
     "PDF_OFFICE_MISMATCH": "Офис в имени PDF противоречит офису Excel; файл пропущен",
     "PDF_PROJECT_SCOPE_MISMATCH": (

@@ -2,6 +2,7 @@
 
 import re
 from dataclasses import dataclass
+from datetime import date
 from pathlib import Path
 
 from sarex_loader.api_models import parse_document
@@ -20,7 +21,8 @@ def journal_path():
     return Path.home() / ".sarex-loader-production-journal"
 
 
-def operation_key(item):
+def legacy_operation_key(item):
+    """Read compatibility only: never rewrite or re-key existing journal rows."""
     return fingerprint(
         {
             "profile": item["registry_type"],
@@ -29,6 +31,26 @@ def operation_key(item):
             "mode": CONTEXT["mode"],
         }
     )
+
+
+def operation_key(item):
+    try:
+        day = date.fromisoformat(item["bundle_date"][:10]).isoformat()
+    except (KeyError, TypeError, ValueError):
+        raise ValidationError("Для ключа инспекции нужна корректная дата Excel.") from None
+    return fingerprint({"inspection": legacy_operation_key(item), "date": day, "version": 2})
+
+
+def stored_identity_keys(operations):
+    """Index old/new keys without changing any persisted payload or checkpoint."""
+    identities = {}
+    for key, item in operations.items():
+        validate_item(item)
+        identity = operation_key(item)
+        if key not in {identity, legacy_operation_key(item)} or identity in identities:
+            raise ValidationError("Неоднозначные ключи рабочего журнала; нужна ручная сверка.")
+        identities[identity] = key
+    return identities
 
 
 def validate_item(item):
